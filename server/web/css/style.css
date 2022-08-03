@@ -1,0 +1,66 @@
+.register {
+    display: flex;
+
+    flex-direction: row;
+
+    justify-content: flex-start;
+
+    padding: 20px;
+    
+    color: red;
+}
+
+input {
+    margin: 5px;
+    width: 5cm;
+}
+
+.email {
+    display: flex;
+
+    flex-direction: column;
+
+    justify-content: flex-start;
+    
+    color: red;
+}
+
+.password {
+    display: flex;
+
+    flex-direction: column;
+
+    justify-content: flex-start;
+    
+    color: red;
+}
+
+.submit.register-user{
+    display: flex;
+    
+    align-self: flex-end;
+
+    justify-content: flex-start;
+
+    width: 5px;
+}
+
+.upload {
+    display: flex;
+
+    flex-direction: row;
+
+    justify-content: flex-start;
+
+    padding: 20px;
+}
+
+.submit.upload-file {
+    display: flex;
+
+    flex-direction: row;
+
+    justify-content: flex-start;
+
+    width: 5px;
+}
