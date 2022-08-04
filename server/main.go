@@ -24,15 +24,26 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"server/database"
 	"time"
 
 	"github.com/gorilla/mux"
 )
 
+func registerHandler(w http.ResponseWriter, r *http.Request) {
+	email := r.FormValue("email")
+	pass := r.FormValue("password")
+	database.RegisterUser(email, pass)
+
+	http.Redirect(w, r, "/", http.StatusFound)
+}
+
 func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	file, fileHeader, err := r.FormFile("file")
 	if err != nil {
 		log.Println(err)
+		http.Redirect(w, r, "/", http.StatusFound)
+		return
 	}
 	defer file.Close()
 
@@ -78,6 +89,7 @@ func main() {
 	r := mux.NewRouter()
 	r.HandleFunc("/", indexHandler)
 	r.HandleFunc("/upload", uploadHandler)
+	r.HandleFunc("/register", registerHandler)
 
 	fileServer := http.FileServer(http.Dir("./web/css"))
 	r.PathPrefix("/css/").Handler(http.StripPrefix("/css", fileServer))

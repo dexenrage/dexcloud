@@ -1,8 +1,8 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
-    <meta http-equiv="Content-Type" charset="text/html; UTF-8; multipart/form-data">
-    <title>Title</title>
+    <meta charset="UTF-8">
+    <title>DexCloud</title>
     <link rel="stylesheet" href="/css/style.css" type="text/css">
 </head>
 <!--
@@ -14,23 +14,23 @@
     Остальные просто не найдут...
 -->
 <body>
-    <form class="register" method="post">
+    <form class="register" action="/register" method="post">
         <div class="email">
             <b>E-Mail:</b>
-            <input type="email">
+            <input type="email" name="email">
         </div>
         <div class="password">
             <b>Password:</b><br>
-            <input type="password">
+            <input type="password" name="password">
         </div>
         <div class="submit register-user">
-            <input type="submit" value="Submit">
+            <input type="submit" name="submit" value="Submit">
         </div>
     </form>
     <form class="upload" action="/upload" method="post" enctype="multipart/form-data">
         <input type="file" name="file">
         <div class="submit upload-file">
-            <input type="submit" value="Upload">
+            <input type="submit" formenctype="multipart/form-data" value="Upload">
         </div>
     </form>
 </body>
