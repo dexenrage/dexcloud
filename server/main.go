@@ -17,56 +17,59 @@ limitations under the License.
 package main
 
 import (
-	"fmt"
 	"html/template"
-	"io"
 	"log"
 	"net/http"
 	"os"
 	"path/filepath"
-	"server/database"
+	"server/api"
 	"time"
 
 	"github.com/gorilla/mux"
 )
 
-func registerHandler(w http.ResponseWriter, r *http.Request) {
-	email := r.FormValue("email")
-	pass := r.FormValue("password")
-	database.RegisterUser(email, pass)
-
-	http.Redirect(w, r, "/", http.StatusFound)
-}
-
-func uploadHandler(w http.ResponseWriter, r *http.Request) {
-	file, fileHeader, err := r.FormFile("file")
-	if err != nil {
-		log.Println(err)
-		http.Redirect(w, r, "/", http.StatusFound)
-		return
-	}
-	defer file.Close()
-
-	err = os.Mkdir("./uploads", os.ModePerm)
+func init() {
+	err := os.Mkdir(`./uploads`, os.ModePerm)
 	if os.IsExist(err) {
 		err = nil
 	}
 	if err != nil {
-		log.Println(err)
+		log.Fatalln(err)
 	}
+}
 
-	dst, err := os.Create(fmt.Sprintf("./uploads/%d%s", time.Now().UnixNano(), filepath.Ext(fileHeader.Filename)))
-	if err != nil {
-		log.Println(err)
+func prepareFileServer(r *mux.Router) {
+	const (
+		files  = `./web/static`
+		static = `/static`
+	)
+
+	var (
+		dir = http.Dir(files)
+		fs  = http.FileServer(dir)
+
+		prefix = http.StripPrefix(static, fs)
+		path   = r.PathPrefix(static + `/`)
+	)
+
+	path.Handler(prefix).Methods("GET")
+}
+
+func main() {
+	r := mux.NewRouter()
+	r.HandleFunc("/", indexHandler).Methods("GET")
+	r.HandleFunc("/profile", profileHandler).Methods("GET")
+
+	prepareFileServer(r)
+	api.BuildApi(r)
+
+	srv := http.Server{
+		Addr:         "localhost:80",
+		Handler:      r,
+		WriteTimeout: 15 * time.Second,
+		ReadTimeout:  15 * time.Second,
 	}
-	defer dst.Close()
-
-	_, err = io.Copy(dst, file)
-	if err != nil {
-		log.Println(err)
-	}
-
-	http.Redirect(w, r, "/", http.StatusFound)
+	log.Fatalln(srv.ListenAndServe())
 }
 
 func indexHandler(w http.ResponseWriter, r *http.Request) {
@@ -85,20 +88,17 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func main() {
-	r := mux.NewRouter()
-	r.HandleFunc("/", indexHandler)
-	r.HandleFunc("/upload", uploadHandler)
-	r.HandleFunc("/register", registerHandler)
-
-	fileServer := http.FileServer(http.Dir("./web/css"))
-	r.PathPrefix("/css/").Handler(http.StripPrefix("/css", fileServer))
-
-	srv := http.Server{
-		Addr:         "localhost:80",
-		Handler:      r,
-		WriteTimeout: 15 * time.Second,
-		ReadTimeout:  15 * time.Second,
+func profileHandler(w http.ResponseWriter, r *http.Request) {
+	path := filepath.Join("web", "profile.html")
+	tmpl, err := template.ParseFiles(path)
+	if err != nil {
+		log.Println(err)
+		return
 	}
-	log.Fatalln(srv.ListenAndServe())
+
+	err = tmpl.Execute(w, nil)
+	if err != nil {
+		log.Println(err)
+		return
+	}
 }

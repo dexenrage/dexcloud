@@ -20,9 +20,26 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"math/rand"
+	"strconv"
 
 	"github.com/jackc/pgx/v4"
+	"golang.org/x/crypto/bcrypt"
 )
+
+func init() {
+	conn, err := connect()
+	if err != nil {
+		log.Fatalln(err)
+	}
+	defer conn.Close(context.Background())
+
+	resp, err := conn.Query(context.Background(), createTableQuery)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	defer resp.Close()
+}
 
 func connect() (*pgx.Conn, error) {
 	const auth = "user=postgres password=123456 host=localhost port=5432 dbname=users"
@@ -39,17 +56,27 @@ func connect() (*pgx.Conn, error) {
 	return conn, err
 }
 
-func RegisterUser(email, pass string) {
+func RegisterUser(login, pass string) error {
 	conn, err := connect()
 	if err != nil {
 		log.Fatalln(err)
 	}
 	defer conn.Close(context.Background())
 
-	q := fmt.Sprintf(`insert into users(email, password) values ('%s', '%s')`, email, pass)
-	resp, err := conn.Query(context.Background(), q)
+	const cost = 10
+	hash, err := bcrypt.GenerateFromPassword([]byte(pass), cost)
+	if err != nil {
+		return err
+	}
+
+	pass = string(hash)
+	token := strconv.Itoa(rand.Int()) // temporary (!!!)
+	query := fmt.Sprintf(regUserQuery, login, pass, token)
+
+	resp, err := conn.Query(context.Background(), query)
 	if err != nil {
 		log.Fatalln(err)
 	}
 	defer resp.Close()
+	return err
 }

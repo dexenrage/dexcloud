@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <title>DexCloud</title>
-    <link rel="stylesheet" href="/css/style.css" type="text/css">
+    <link rel="stylesheet" href="/static/css/style.css" type="text/css">
 </head>
 <!--
     Ребята не стоит вскрывать этот код. Вы молодые, шутливые, вам все легко.
@@ -14,7 +14,7 @@
     Остальные просто не найдут...
 -->
 <body>
-    <form class="register" action="/register" method="post">
+    <form class="register" action="/api/register" method="post">
         <div class="email">
             <b>E-Mail:</b>
             <input type="email" name="email">
@@ -25,12 +25,6 @@
         </div>
         <div class="submit register-user">
             <input type="submit" name="submit" value="Submit">
-        </div>
-    </form>
-    <form class="upload" action="/upload" method="post" enctype="multipart/form-data">
-        <input type="file" name="file">
-        <div class="submit upload-file">
-            <input type="submit" formenctype="multipart/form-data" value="Upload">
         </div>
     </form>
 </body>
