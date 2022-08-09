@@ -63,8 +63,7 @@ func RegisterUser(login, pass string) error {
 	}
 	defer conn.Close(context.Background())
 
-	const cost = 10
-	hash, err := bcrypt.GenerateFromPassword([]byte(pass), cost)
+	hash, err := bcrypt.GenerateFromPassword([]byte(pass), bcrypt.DefaultCost)
 	if err != nil {
 		return err
 	}

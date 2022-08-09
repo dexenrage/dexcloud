@@ -1,66 +1,27 @@
 .register {
     display: flex;
-
-    flex-direction: row;
-
-    justify-content: flex-start;
-
-    padding: 20px;
-    
-    color: red;
-}
-
-input {
-    margin: 5px;
-    width: 5cm;
+    inline-size: fit-content;
+    margin: 1cm;
+    gap: 5px;
 }
 
 .email {
     display: flex;
-
     flex-direction: column;
-
-    justify-content: flex-start;
-    
-    color: red;
 }
 
 .password {
     display: flex;
-
     flex-direction: column;
-
-    justify-content: flex-start;
-    
-    color: red;
 }
 
-.submit.register-user{
+.submit {
     display: flex;
-    
-    align-self: flex-end;
-
-    justify-content: flex-start;
-
-    width: 5px;
+    flex-direction: column-reverse;
 }
 
 .upload {
     display: flex;
-
-    flex-direction: row;
-
-    justify-content: flex-start;
-
-    padding: 20px;
-}
-
-.submit.upload-file {
-    display: flex;
-
-    flex-direction: row;
-
-    justify-content: flex-start;
-
-    width: 5px;
+    inline-size: fit-content;
+    margin: 1cm;
 }

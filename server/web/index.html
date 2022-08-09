@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>DexCloud</title>
-    <link rel="stylesheet" href="/static/css/style.css" type="text/css">
+    <link rel="stylesheet" href="/static/css/style.css?1" type="text/css">
 </head>
 <!--
     Ребята не стоит вскрывать этот код. Вы молодые, шутливые, вам все легко.
@@ -14,18 +14,19 @@
     Остальные просто не найдут...
 -->
 <body>
-    <form class="register" action="/api/register" method="post">
+    <form class="register" method="post">
         <div class="email">
-            <b>E-Mail:</b>
-            <input type="email" name="email">
+            <label for="email"><b>E-Mail:</b></label>
+            <input type="email" name="email" id="email">
         </div>
         <div class="password">
-            <b>Password:</b><br>
-            <input type="password" name="password">
+            <label for="password"><b>Password:</b></label>
+            <input type="password" name="password" id="password">
         </div>
-        <div class="submit register-user">
-            <input type="submit" name="submit" value="Submit">
+        <div class="submit">
+            <button>Submit</button>
         </div>
+        <script src="/static/js/register.js"></script>
     </form>
 </body>
 </html>

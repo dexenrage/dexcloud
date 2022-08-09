@@ -3,14 +3,12 @@
     <head>
         <meta charset="UTF-8">
         <title>Profile</title>
-        <link rel="stylesheet" href="/css/style.css" type="text/css">
+        <link rel="stylesheet" href="/static/css/style.css" type="text/css">
     </head>
     <body>
-        <form class="upload" action="/api/upload" method="post" enctype="multipart/form-data">
+        <form class="upload" method="post" enctype="multipart/form-data">
             <input type="file" name="file">
-            <div class="submit upload-file">
-                <input type="submit" formenctype="multipart/form-data" value="Upload">
-            </div>
+            <input type="submit" formenctype="multipart/form-data" value="Upload">
         </form>
     </body>
 </html>

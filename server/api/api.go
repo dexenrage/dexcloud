@@ -17,15 +17,20 @@ limitations under the License.
 package api
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"os"
-	"server/database"
 
 	"github.com/gorilla/mux"
 )
+
+type Account struct {
+	Login    string `json:"email"`
+	Password string `json:"password"`
+}
 
 func BuildApi(r *mux.Router) {
 	r.HandleFunc(`/api/register`, registerHandler).Methods("POST")
@@ -33,12 +38,21 @@ func BuildApi(r *mux.Router) {
 }
 
 func registerHandler(w http.ResponseWriter, r *http.Request) {
-	var (
-		login = r.FormValue("login")
-		pass  = r.FormValue("password")
-	)
-	database.RegisterUser(login, pass)
-	http.Redirect(w, r, "/profile", http.StatusFound)
+	bodyBuffer, _ := io.ReadAll(r.Body)
+
+	var acc Account
+
+	err := json.Unmarshal(bodyBuffer, &acc)
+	if err != nil {
+		log.Println(err)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	io.WriteString(w, `{ "message": "OK" }`)
+
+	//database.RegisterUser(login, pass)
+	//http.Redirect(w, r, "/profile", http.StatusFound)
 }
 
 func uploadHandler(w http.ResponseWriter, r *http.Request) {
