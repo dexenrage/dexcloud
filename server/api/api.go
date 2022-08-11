@@ -20,9 +20,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"os"
+
+	"server/logger"
 
 	"github.com/gorilla/mux"
 )
@@ -44,15 +45,20 @@ func registerHandler(w http.ResponseWriter, r *http.Request) {
 
 	err := json.Unmarshal(bodyBuffer, &acc)
 	if err != nil {
-		log.Println(err)
+		logger.Errorln(err)
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		io.WriteString(w, `{ "message": "Internal Server Error" }`)
+
+		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	io.WriteString(w, `{ "message": "OK" }`)
-
 	//database.RegisterUser(login, pass)
-	//http.Redirect(w, r, "/profile", http.StatusFound)
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	io.WriteString(w, `{ "message": "Created" }`)
 }
 
 func uploadHandler(w http.ResponseWriter, r *http.Request) {
@@ -63,7 +69,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 
 	file, fileHeader, err := r.FormFile("file")
 	if err != nil {
-		log.Println(err)
+		logger.Errorln(err)
 		http.Redirect(w, r, redirectPath, http.StatusFound)
 		return
 	}
@@ -76,15 +82,17 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 
 	dst, err := os.Create(filepath)
 	if err != nil {
-		log.Println(err)
+		logger.Errorln(err)
 		http.Redirect(w, r, redirectPath, http.StatusFound)
+		return
 	}
 	defer dst.Close()
 
 	_, err = io.Copy(dst, file)
 	if err != nil {
-		log.Println(err)
+		logger.Errorln(err)
 		http.Redirect(w, r, redirectPath, http.StatusFound)
+		return
 	}
 	http.Redirect(w, r, redirectPath, http.StatusFound)
 }

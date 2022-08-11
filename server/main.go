@@ -18,11 +18,11 @@ package main
 
 import (
 	"html/template"
-	"log"
 	"net/http"
 	"os"
 	"path/filepath"
 	"server/api"
+	"server/logger"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -34,7 +34,7 @@ func init() {
 		err = nil
 	}
 	if err != nil {
-		log.Fatalln(err)
+		logger.Panicln(err)
 	}
 }
 
@@ -56,6 +56,8 @@ func prepareFileServer(r *mux.Router) {
 }
 
 func main() {
+	defer logger.Sync()
+
 	r := mux.NewRouter()
 	r.HandleFunc("/", indexHandler).Methods("GET")
 	r.HandleFunc("/profile", profileHandler).Methods("GET")
@@ -69,7 +71,7 @@ func main() {
 		WriteTimeout: 15 * time.Second,
 		ReadTimeout:  15 * time.Second,
 	}
-	log.Fatalln(srv.ListenAndServe())
+	logger.Panicln(srv.ListenAndServe())
 }
 
 func indexHandler(w http.ResponseWriter, r *http.Request) {
@@ -77,14 +79,12 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 	tmpl, err := template.ParseFiles(path)
 
 	if err != nil {
-		log.Println(err)
-		return
+		logger.Panicln(err)
 	}
 
 	err = tmpl.Execute(w, nil)
 	if err != nil {
-		log.Println(err)
-		return
+		logger.Panicln(err)
 	}
 }
 
@@ -92,13 +92,11 @@ func profileHandler(w http.ResponseWriter, r *http.Request) {
 	path := filepath.Join("web", "profile.html")
 	tmpl, err := template.ParseFiles(path)
 	if err != nil {
-		log.Println(err)
-		return
+		logger.Panicln(err)
 	}
 
 	err = tmpl.Execute(w, nil)
 	if err != nil {
-		log.Println(err)
-		return
+		logger.Panicln(err)
 	}
 }

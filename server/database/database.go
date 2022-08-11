@@ -19,8 +19,8 @@ package database
 import (
 	"context"
 	"fmt"
-	"log"
 	"math/rand"
+	"server/logger"
 	"strconv"
 
 	"github.com/jackc/pgx/v4"
@@ -30,13 +30,13 @@ import (
 func init() {
 	conn, err := connect()
 	if err != nil {
-		log.Fatalln(err)
+		logger.Panicln(err)
 	}
 	defer conn.Close(context.Background())
 
 	resp, err := conn.Query(context.Background(), createTableQuery)
 	if err != nil {
-		log.Fatalln(err)
+		logger.Panicln(err)
 	}
 	defer resp.Close()
 }
@@ -46,7 +46,7 @@ func connect() (*pgx.Conn, error) {
 
 	cs, err := pgx.ParseConfig(auth)
 	if err != nil {
-		log.Fatalln(err)
+		return nil, err
 	}
 
 	conn, err := pgx.ConnectConfig(context.Background(), cs)
@@ -59,7 +59,7 @@ func connect() (*pgx.Conn, error) {
 func RegisterUser(login, pass string) error {
 	conn, err := connect()
 	if err != nil {
-		log.Fatalln(err)
+		return err
 	}
 	defer conn.Close(context.Background())
 
@@ -74,7 +74,7 @@ func RegisterUser(login, pass string) error {
 
 	resp, err := conn.Query(context.Background(), query)
 	if err != nil {
-		log.Fatalln(err)
+		return err
 	}
 	defer resp.Close()
 	return err
