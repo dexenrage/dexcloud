@@ -24,6 +24,7 @@ import (
 	"os"
 
 	"server/logger"
+	"server/user"
 
 	"github.com/gorilla/mux"
 )
@@ -36,6 +37,27 @@ type Account struct {
 func BuildApi(r *mux.Router) {
 	r.HandleFunc(`/api/register`, registerHandler).Methods("POST")
 	r.HandleFunc(`/api/upload`, uploadHandler).Methods("POST")
+	r.HandleFunc(`/api/filelist`, fileListHandler).Methods("GET")
+}
+
+func fileListHandler(w http.ResponseWriter, r *http.Request) {
+	f, err := user.GetFiles(1)
+	if err != nil {
+		logger.Errorln(err)
+	}
+
+	data := map[string]interface{}{
+		"files": f,
+	}
+
+	x, err := json.Marshal(data)
+	if err != nil {
+		logger.Errorln(err)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	io.WriteString(w, string(x))
 }
 
 func registerHandler(w http.ResponseWriter, r *http.Request) {
@@ -56,6 +78,21 @@ func registerHandler(w http.ResponseWriter, r *http.Request) {
 
 	//database.RegisterUser(login, pass)
 
+	// Temporary
+	userID := 1
+	dir := fmt.Sprint(`./uploads/`, userID)
+
+	err = os.Mkdir(dir, os.ModePerm)
+	if err != nil {
+		logger.Errorln(err)
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		io.WriteString(w, `{ "message": "Internal Server Error" }`)
+
+		return
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	io.WriteString(w, `{ "message": "Created" }`)
@@ -63,7 +100,8 @@ func registerHandler(w http.ResponseWriter, r *http.Request) {
 
 func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	const (
-		createFileDIR = `./uploads/%s`
+		userID        = 1
+		createFileDIR = `./uploads/%d/%s`
 		redirectPath  = `/profile`
 	)
 
@@ -77,7 +115,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 
 	var (
 		filename = fileHeader.Filename
-		filepath = fmt.Sprintf(createFileDIR, filename)
+		filepath = fmt.Sprintf(createFileDIR, userID, filename)
 	)
 
 	dst, err := os.Create(filepath)

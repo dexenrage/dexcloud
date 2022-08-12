@@ -14,43 +14,23 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package logger
+package user
 
 import (
-	"errors"
 	"fmt"
-
-	"go.uber.org/zap"
+	"os"
 )
 
-var logger *zap.SugaredLogger
+func GetFiles(userID int) ([]string, error) {
+	userDIR := fmt.Sprint(`./uploads/`, userID)
+	var files []string
 
-func init() {
-	lg, err := zap.NewDevelopment()
+	dirEntry, err := os.ReadDir(userDIR)
 	if err != nil {
-		msg := `Failed to initialize Zap logger: %v`
-		msg = fmt.Sprintf(msg, err)
-		err = errors.New(msg)
-		panic(err)
+		return nil, err
 	}
-
-	logger = lg.Sugar()
-	defer Sync()
-}
-
-func Errorln(err error) {
-	logger.Errorln(err)
-}
-
-func Fatalln(err error) {
-	logger.Sync()
-	logger.Fatalln(err)
-}
-
-func Panicln(err error) {
-	logger.Panicln(err)
-}
-
-func Sync() {
-	logger.Sync()
+	for _, f := range dirEntry {
+		files = append(files, f.Name())
+	}
+	return files, err
 }

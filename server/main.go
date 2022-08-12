@@ -51,7 +51,23 @@ func prepareFileServer(r *mux.Router) {
 		prefix = http.StripPrefix(static, fs)
 		path   = r.PathPrefix(static + `/`)
 	)
+	path.Handler(prefix).Methods("GET")
+}
 
+/*
+ * UNSAFE UNSAFE UNSAFE UNSAFE UNSAFE
+ */
+func prepareUserFileServer(r *mux.Router) {
+	const (
+		files = `./uploads`
+		link  = `/uploads`
+	)
+	var (
+		dir    = http.Dir(files)
+		fs     = http.FileServer(dir)
+		prefix = http.StripPrefix(link, fs)
+		path   = r.PathPrefix(link + `/`)
+	)
 	path.Handler(prefix).Methods("GET")
 }
 
@@ -63,6 +79,7 @@ func main() {
 	r.HandleFunc("/profile", profileHandler).Methods("GET")
 
 	prepareFileServer(r)
+	prepareUserFileServer(r)
 	api.BuildApi(r)
 
 	srv := http.Server{
