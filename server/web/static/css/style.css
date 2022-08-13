@@ -5,7 +5,7 @@
     gap: 5px;
 }
 
-.email {
+.login {
     display: flex;
     flex-direction: column;
 }

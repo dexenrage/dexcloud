@@ -30,7 +30,7 @@ import (
 )
 
 type Account struct {
-	Login    string `json:"email"`
+	Login    string `json:"login"`
 	Password string `json:"password"`
 }
 
@@ -44,6 +44,8 @@ func fileListHandler(w http.ResponseWriter, r *http.Request) {
 	f, err := user.GetFiles(1)
 	if err != nil {
 		logger.Errorln(err)
+		responseInternalServerError(w)
+		return
 	}
 
 	data := map[string]interface{}{
@@ -53,26 +55,20 @@ func fileListHandler(w http.ResponseWriter, r *http.Request) {
 	x, err := json.Marshal(data)
 	if err != nil {
 		logger.Errorln(err)
+		responseInternalServerError(w)
+		return
 	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	io.WriteString(w, string(x))
+	responseCustomJSON(w, http.StatusOK, string(x))
 }
 
 func registerHandler(w http.ResponseWriter, r *http.Request) {
 	bodyBuffer, _ := io.ReadAll(r.Body)
-
 	var acc Account
 
 	err := json.Unmarshal(bodyBuffer, &acc)
 	if err != nil {
 		logger.Errorln(err)
-
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusInternalServerError)
-		io.WriteString(w, `{ "message": "Internal Server Error" }`)
-
+		responseInternalServerError(w)
 		return
 	}
 
@@ -85,17 +81,10 @@ func registerHandler(w http.ResponseWriter, r *http.Request) {
 	err = os.Mkdir(dir, os.ModePerm)
 	if err != nil {
 		logger.Errorln(err)
-
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusInternalServerError)
-		io.WriteString(w, `{ "message": "Internal Server Error" }`)
-
+		responseInternalServerError(w)
 		return
 	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	io.WriteString(w, `{ "message": "Created" }`)
+	responseCreated(w)
 }
 
 func uploadHandler(w http.ResponseWriter, r *http.Request) {
@@ -108,7 +97,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	file, fileHeader, err := r.FormFile("file")
 	if err != nil {
 		logger.Errorln(err)
-		http.Redirect(w, r, redirectPath, http.StatusFound)
+		responseInternalServerError(w)
 		return
 	}
 	defer file.Close()
@@ -121,7 +110,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	dst, err := os.Create(filepath)
 	if err != nil {
 		logger.Errorln(err)
-		http.Redirect(w, r, redirectPath, http.StatusFound)
+		responseInternalServerError(w)
 		return
 	}
 	defer dst.Close()
@@ -129,8 +118,8 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	_, err = io.Copy(dst, file)
 	if err != nil {
 		logger.Errorln(err)
-		http.Redirect(w, r, redirectPath, http.StatusFound)
+		responseInternalServerError(w)
 		return
 	}
-	http.Redirect(w, r, redirectPath, http.StatusFound)
+	responseOK(w)
 }
