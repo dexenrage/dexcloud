@@ -22,6 +22,7 @@ import (
 	"os"
 	"path/filepath"
 	"server/api"
+	"server/apperror"
 	"server/logger"
 	"time"
 
@@ -75,8 +76,8 @@ func main() {
 	defer logger.Sync()
 
 	r := mux.NewRouter()
-	r.HandleFunc("/", indexHandler).Methods("GET")
-	r.HandleFunc("/profile", profileHandler).Methods("GET")
+	r.HandleFunc("/", apperror.Middleware(indexHandler)).Methods("GET")
+	r.HandleFunc("/profile", apperror.Middleware(profileHandler)).Methods("GET")
 
 	prepareFileServer(r)
 	prepareUserFileServer(r)
@@ -91,29 +92,35 @@ func main() {
 	logger.Panicln(srv.ListenAndServe())
 }
 
-func indexHandler(w http.ResponseWriter, r *http.Request) {
+func indexHandler(w http.ResponseWriter, r *http.Request) (err error) {
 	path := filepath.Join("web", "index.html")
 	tmpl, err := template.ParseFiles(path)
 
 	if err != nil {
 		logger.Panicln(err)
+		return err
 	}
 
 	err = tmpl.Execute(w, nil)
 	if err != nil {
 		logger.Panicln(err)
+		return err
 	}
+	return err
 }
 
-func profileHandler(w http.ResponseWriter, r *http.Request) {
+func profileHandler(w http.ResponseWriter, r *http.Request) (err error) {
 	path := filepath.Join("web", "profile.html")
 	tmpl, err := template.ParseFiles(path)
 	if err != nil {
 		logger.Panicln(err)
+		return err
 	}
 
 	err = tmpl.Execute(w, nil)
 	if err != nil {
 		logger.Panicln(err)
+		return err
 	}
+	return err
 }

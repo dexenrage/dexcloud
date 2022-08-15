@@ -23,6 +23,7 @@ import (
 	"net/http"
 	"os"
 
+	"server/apperror"
 	"server/logger"
 	"server/user"
 
@@ -35,17 +36,17 @@ type Account struct {
 }
 
 func BuildApi(r *mux.Router) {
-	r.HandleFunc(`/api/register`, registerHandler).Methods("POST")
-	r.HandleFunc(`/api/upload`, uploadHandler).Methods("POST")
-	r.HandleFunc(`/api/filelist`, fileListHandler).Methods("GET")
+	r.HandleFunc(`/api/register`, apperror.Middleware(registerHandler)).Methods("POST")
+	r.HandleFunc(`/api/upload`, apperror.Middleware(uploadHandler)).Methods("POST")
+	r.HandleFunc(`/api/filelist`, apperror.Middleware(fileListHandler)).Methods("GET")
 }
 
-func fileListHandler(w http.ResponseWriter, r *http.Request) {
+func fileListHandler(w http.ResponseWriter, r *http.Request) (err error) {
 	f, err := user.GetFiles(1)
 	if err != nil {
 		logger.Errorln(err)
 		responseInternalServerError(w)
-		return
+		return err
 	}
 
 	data := map[string]interface{}{
@@ -56,38 +57,61 @@ func fileListHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		logger.Errorln(err)
 		responseInternalServerError(w)
-		return
+		return err
 	}
 	responseCustomJSON(w, http.StatusOK, string(x))
+	return err
 }
 
-func registerHandler(w http.ResponseWriter, r *http.Request) {
+var Acl Account
+
+func registerHandler(w http.ResponseWriter, r *http.Request) (err error) {
 	bodyBuffer, _ := io.ReadAll(r.Body)
 	var acc Account
 
-	err := json.Unmarshal(bodyBuffer, &acc)
+	err = json.Unmarshal(bodyBuffer, &acc)
 	if err != nil {
 		logger.Errorln(err)
 		responseInternalServerError(w)
-		return
+		return err
 	}
 
+	Acl.Login = acc.Login
+	Acl.Password = acc.Password
+
 	//database.RegisterUser(login, pass)
+
+	tkn, err := signIn(&acc)
+	if err != nil {
+		logger.Errorln(err)
+		responseInternalServerError(w)
+		return err
+	}
 
 	// Temporary
 	userID := 1
 	dir := fmt.Sprint(`./uploads/`, userID)
 
 	err = os.Mkdir(dir, os.ModePerm)
+	if os.IsExist(err) {
+		err = nil
+	}
 	if err != nil {
 		logger.Errorln(err)
 		responseInternalServerError(w)
-		return
+		return err
 	}
-	responseCreated(w)
+	jsonResp := fmt.Sprintf(`{ "token": "%s" }`, tkn)
+	responseCustomJSON(w, http.StatusCreated, jsonResp)
+	return err
 }
 
-func uploadHandler(w http.ResponseWriter, r *http.Request) {
+func uploadHandler(w http.ResponseWriter, r *http.Request) (err error) {
+	// temporary
+	err = checkAuth(w, r)
+	if err != nil {
+		return err
+	}
 	const (
 		userID        = 1
 		createFileDIR = `./uploads/%d/%s`
@@ -98,7 +122,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		logger.Errorln(err)
 		responseInternalServerError(w)
-		return
+		return err
 	}
 	defer file.Close()
 
@@ -111,7 +135,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		logger.Errorln(err)
 		responseInternalServerError(w)
-		return
+		return err
 	}
 	defer dst.Close()
 
@@ -119,7 +143,8 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		logger.Errorln(err)
 		responseInternalServerError(w)
-		return
+		return err
 	}
 	responseOK(w)
+	return err
 }

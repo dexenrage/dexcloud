@@ -38,11 +38,11 @@ func responseOK(w http.ResponseWriter) {
 	io.WriteString(w, `{ "message": "OK" }`)
 }
 
-func responseCreated(w http.ResponseWriter) {
+/*func responseCreated(w http.ResponseWriter) {
 	w.Header().Set(defaultType, defaultValue)
 	w.WriteHeader(http.StatusCreated)
 	io.WriteString(w, `{ "message": "Created" }`)
-}
+}*/
 
 func responseInternalServerError(w http.ResponseWriter) {
 	w.Header().Set(defaultType, defaultValue)
