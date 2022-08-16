@@ -21,28 +21,28 @@ import (
 )
 
 var (
-	ErrBadRequest          = NewAppError(nil, "Bad Request", "", "US-000400")
-	ErrNotFound            = NewAppError(nil, "Not Found", "", "US-000404")
-	ErrUnathorized         = NewAppError(nil, "Unathorized", "", "US-000401")
-	ErrInternalServerError = NewAppError(nil, "Internal Server Error", "", "US-000500")
+	ErrBadRequest          = NewError(nil, "Bad Request", "", "US-000400")
+	ErrNotFound            = NewError(nil, "Not Found", "", "US-000404")
+	ErrUnathorized         = NewError(nil, "Unathorized", "", "US-000401")
+	ErrInternalServerError = NewError(nil, "Internal Server Error", "", "US-000500")
 )
 
-type AppError struct {
+type CustomError struct {
 	Err        error  `json:"-"`
 	Message    string `json:"msg,omitempty"`
 	DevMessage string `json:"devmsg,omitempty"`
 	Code       string `json:"code,omitempty"`
 }
 
-func (e *AppError) Error() string {
+func (e *CustomError) Error() string {
 	return e.Message
 }
 
-func (e *AppError) Unwrap() error {
+func (e *CustomError) Unwrap() error {
 	return e.Err
 }
 
-func (e *AppError) Marshal() []byte {
+func (e *CustomError) Marshal() []byte {
 	marshal, err := json.Marshal(e)
 	if err != nil {
 		return nil
@@ -50,11 +50,18 @@ func (e *AppError) Marshal() []byte {
 	return marshal
 }
 
-func NewAppError(err error, message, devMessage, code string) *AppError {
-	return &AppError{
+func NewError(err error, message, devMessage, code string) *CustomError {
+	if err != nil && devMessage == "" {
+		devMessage = err.Error()
+	}
+	return &CustomError{
 		Err:        err,
 		Message:    message,
 		DevMessage: devMessage,
 		Code:       code,
 	}
+}
+
+func systemError(err error) *CustomError {
+	return NewError(err, "Internal System Error", err.Error(), "SYSERROR-000001")
 }

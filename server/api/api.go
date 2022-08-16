@@ -20,11 +20,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
+	"path/filepath"
+	"strconv"
 
 	"server/apperror"
-	"server/logger"
+	"server/directory"
 	"server/user"
 
 	"github.com/gorilla/mux"
@@ -36,34 +39,44 @@ type Account struct {
 }
 
 func BuildApi(r *mux.Router) {
-	r.HandleFunc(`/api/register`, apperror.Middleware(registerHandler)).Methods("POST")
-	r.HandleFunc(`/api/upload`, apperror.Middleware(uploadHandler)).Methods("POST")
-	r.HandleFunc(`/api/filelist`, apperror.Middleware(fileListHandler)).Methods("GET")
+	r.HandleFunc(directory.ApiRegisterHTTP, apperror.Middleware(registerHandler)).Methods(http.MethodPost)
+	r.HandleFunc(directory.ApiUploadHTTP, apperror.Middleware(uploadHandler)).Methods(http.MethodPost)
+	r.HandleFunc(directory.ApiFileListHTTP, apperror.Middleware(fileListHandler)).Methods(http.MethodGet)
 }
 
 func fileListHandler(w http.ResponseWriter, r *http.Request) (err error) {
-	f, err := user.GetFiles(1)
+	files, err := user.GetFiles(userDir())
 	if err != nil {
-		logger.Errorln(err)
-		responseInternalServerError(w)
-		return err
+		log.Println(err)
+		apperror.ErrInternalServerError.Err = err
+		return apperror.ErrInternalServerError
 	}
 
 	data := map[string]interface{}{
-		"files": f,
+		"files": files,
 	}
 
 	x, err := json.Marshal(data)
 	if err != nil {
-		logger.Errorln(err)
-		responseInternalServerError(w)
-		return err
+		apperror.ErrInternalServerError.Err = err
+		return apperror.ErrInternalServerError
 	}
 	responseCustomJSON(w, http.StatusOK, string(x))
 	return err
 }
 
-var Acl Account
+// temporary
+func userDir() string {
+	const userID = 1
+	folder := strconv.Itoa(userID)
+	return filepath.Join(directory.UserUploads(), folder)
+}
+
+// temporary
+func userFilePath(filename string) string {
+	dir := userDir()
+	return filepath.Join(dir, filename)
+}
 
 func registerHandler(w http.ResponseWriter, r *http.Request) (err error) {
 	bodyBuffer, _ := io.ReadAll(r.Body)
@@ -71,35 +84,25 @@ func registerHandler(w http.ResponseWriter, r *http.Request) (err error) {
 
 	err = json.Unmarshal(bodyBuffer, &acc)
 	if err != nil {
-		logger.Errorln(err)
-		responseInternalServerError(w)
-		return err
+		apperror.ErrInternalServerError.Err = err
+		return apperror.ErrInternalServerError
 	}
-
-	Acl.Login = acc.Login
-	Acl.Password = acc.Password
 
 	//database.RegisterUser(login, pass)
 
 	tkn, err := signIn(&acc)
 	if err != nil {
-		logger.Errorln(err)
-		responseInternalServerError(w)
-		return err
+		apperror.ErrInternalServerError.Err = err
+		return apperror.ErrInternalServerError
 	}
 
-	// Temporary
-	userID := 1
-	dir := fmt.Sprint(`./uploads/`, userID)
-
-	err = os.Mkdir(dir, os.ModePerm)
+	err = os.Mkdir(userDir(), os.ModePerm)
 	if os.IsExist(err) {
 		err = nil
 	}
 	if err != nil {
-		logger.Errorln(err)
-		responseInternalServerError(w)
-		return err
+		apperror.ErrInternalServerError.Err = err
+		return apperror.ErrInternalServerError
 	}
 	jsonResp := fmt.Sprintf(`{ "token": "%s" }`, tkn)
 	responseCustomJSON(w, http.StatusCreated, jsonResp)
@@ -112,38 +115,25 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) (err error) {
 	if err != nil {
 		return err
 	}
-	const (
-		userID        = 1
-		createFileDIR = `./uploads/%d/%s`
-		redirectPath  = `/profile`
-	)
 
 	file, fileHeader, err := r.FormFile("file")
 	if err != nil {
-		logger.Errorln(err)
-		responseInternalServerError(w)
-		return err
+		apperror.ErrInternalServerError.Err = err
+		return apperror.ErrInternalServerError
 	}
 	defer file.Close()
 
-	var (
-		filename = fileHeader.Filename
-		filepath = fmt.Sprintf(createFileDIR, userID, filename)
-	)
-
-	dst, err := os.Create(filepath)
+	dst, err := os.Create(userFilePath(fileHeader.Filename))
 	if err != nil {
-		logger.Errorln(err)
-		responseInternalServerError(w)
-		return err
+		apperror.ErrInternalServerError.Err = err
+		return apperror.ErrInternalServerError
 	}
 	defer dst.Close()
 
 	_, err = io.Copy(dst, file)
 	if err != nil {
-		logger.Errorln(err)
-		responseInternalServerError(w)
-		return err
+		apperror.ErrInternalServerError.Err = err
+		return apperror.ErrInternalServerError
 	}
 	responseOK(w)
 	return err

@@ -25,9 +25,8 @@ type appHandler func(w http.ResponseWriter, r *http.Request) error
 
 func Middleware(h appHandler) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var appErr *AppError
-		err := h(w, r)
-		if err != nil {
+		var appErr *CustomError
+		if err := h(w, r); err != nil {
 			if errors.As(err, &appErr) {
 				switch {
 				case errors.Is(err, ErrBadRequest):
@@ -47,14 +46,14 @@ func Middleware(h appHandler) http.HandlerFunc {
 					w.Write(ErrInternalServerError.Marshal())
 					return
 				default:
-					err := err.(*AppError)
+					err := err.(*CustomError)
 					w.WriteHeader(http.StatusBadRequest)
 					w.Write(err.Marshal())
+					return
 				}
-
 			}
 			w.WriteHeader(http.StatusTeapot)
-			w.Write([]byte(err.Error()))
+			w.Write(systemError(err).Marshal())
 		}
 	})
 }

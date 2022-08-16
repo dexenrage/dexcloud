@@ -14,26 +14,28 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package api
+package main
 
-import (
-	"io"
-	"net/http"
-)
+import "path/filepath"
 
 const (
-	defaultType  = "Content-Type"
-	defaultValue = "application/json"
+	staticHTTP  = `/static`
+	uploadsHTTP = `/uploads`
+	profileHTTP = `/profile`
 )
 
-func responseCustomJSON(w http.ResponseWriter, status int, msg string) {
-	w.Header().Set(defaultType, defaultValue)
-	w.WriteHeader(status)
-	io.WriteString(w, msg)
+func indexPagePath() string {
+	return filepath.Join("web", "index.html")
 }
 
-func responseOK(w http.ResponseWriter) {
-	w.Header().Set(defaultType, defaultValue)
-	w.WriteHeader(http.StatusOK)
-	io.WriteString(w, `{ "message": "OK" }`)
+func profilePagePath() string {
+	return filepath.Join("web", "profile.html")
+}
+
+func staticFiles() string {
+	return filepath.Join(`web`, `static`)
+}
+
+func uploadsFiles() string {
+	return filepath.Clean(`./uploads`)
 }

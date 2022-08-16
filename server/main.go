@@ -20,9 +20,9 @@ import (
 	"html/template"
 	"net/http"
 	"os"
-	"path/filepath"
 	"server/api"
 	"server/apperror"
+	"server/directory"
 	"server/logger"
 	"time"
 
@@ -30,7 +30,7 @@ import (
 )
 
 func init() {
-	err := os.Mkdir(`./uploads`, os.ModePerm)
+	err := os.Mkdir(directory.UserUploads(), os.ModePerm)
 	if os.IsExist(err) {
 		err = nil
 	}
@@ -40,44 +40,34 @@ func init() {
 }
 
 func prepareFileServer(r *mux.Router) {
-	const (
-		files  = `./web/static`
-		static = `/static`
-	)
-
 	var (
-		dir = http.Dir(files)
-		fs  = http.FileServer(dir)
-
-		prefix = http.StripPrefix(static, fs)
-		path   = r.PathPrefix(static + `/`)
+		dir    = http.Dir(directory.StaticFiles())
+		fs     = http.FileServer(dir)
+		prefix = http.StripPrefix(directory.StaticHTTP, fs)
+		path   = r.PathPrefix(directory.StaticHTTP + directory.Slash)
 	)
-	path.Handler(prefix).Methods("GET")
+	path.Handler(prefix).Methods(http.MethodGet)
 }
 
 /*
  * UNSAFE UNSAFE UNSAFE UNSAFE UNSAFE
  */
 func prepareUserFileServer(r *mux.Router) {
-	const (
-		files = `./uploads`
-		link  = `/uploads`
-	)
 	var (
-		dir    = http.Dir(files)
+		dir    = http.Dir(directory.UserUploads())
 		fs     = http.FileServer(dir)
-		prefix = http.StripPrefix(link, fs)
-		path   = r.PathPrefix(link + `/`)
+		prefix = http.StripPrefix(directory.UploadsHTTP, fs)
+		path   = r.PathPrefix(directory.UploadsHTTP + directory.Slash)
 	)
-	path.Handler(prefix).Methods("GET")
+	path.Handler(prefix).Methods(http.MethodGet)
 }
 
 func main() {
 	defer logger.Sync()
 
 	r := mux.NewRouter()
-	r.HandleFunc("/", apperror.Middleware(indexHandler)).Methods("GET")
-	r.HandleFunc("/profile", apperror.Middleware(profileHandler)).Methods("GET")
+	r.HandleFunc(directory.IndexHTTP, apperror.Middleware(indexHandler)).Methods(http.MethodGet)
+	r.HandleFunc(directory.ProfileHTTP, apperror.Middleware(profileHandler)).Methods(http.MethodGet)
 
 	prepareFileServer(r)
 	prepareUserFileServer(r)
@@ -93,9 +83,7 @@ func main() {
 }
 
 func indexHandler(w http.ResponseWriter, r *http.Request) (err error) {
-	path := filepath.Join("web", "index.html")
-	tmpl, err := template.ParseFiles(path)
-
+	tmpl, err := template.ParseFiles(directory.IndexPage())
 	if err != nil {
 		logger.Panicln(err)
 		return err
@@ -110,8 +98,7 @@ func indexHandler(w http.ResponseWriter, r *http.Request) (err error) {
 }
 
 func profileHandler(w http.ResponseWriter, r *http.Request) (err error) {
-	path := filepath.Join("web", "profile.html")
-	tmpl, err := template.ParseFiles(path)
+	tmpl, err := template.ParseFiles(directory.ProfilePage())
 	if err != nil {
 		logger.Panicln(err)
 		return err

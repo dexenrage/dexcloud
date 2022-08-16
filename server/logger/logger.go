@@ -33,24 +33,15 @@ func init() {
 		err = errors.New(msg)
 		panic(err)
 	}
-
 	logger = lg.Sugar()
 	defer Sync()
 }
 
-func Errorln(err error) {
-	logger.Errorln(err)
-}
+func Sync()             { logger.Sync() }
+func Errorln(err error) { logger.Errorln(err) }
+func Panicln(err error) { logger.Panicln(err) }
 
 func Fatalln(err error) {
 	logger.Sync()
 	logger.Fatalln(err)
-}
-
-func Panicln(err error) {
-	logger.Panicln(err)
-}
-
-func Sync() {
-	logger.Sync()
 }

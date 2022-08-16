@@ -17,15 +17,13 @@ limitations under the License.
 package user
 
 import (
-	"fmt"
 	"os"
 )
 
-func GetFiles(userID int) ([]string, error) {
-	userDIR := fmt.Sprint(`./uploads/`, userID)
+func GetFiles(dir string) ([]string, error) {
 	var files []string
 
-	dirEntry, err := os.ReadDir(userDIR)
+	dirEntry, err := os.ReadDir(dir)
 	if err != nil {
 		return nil, err
 	}

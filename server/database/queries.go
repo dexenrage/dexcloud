@@ -19,10 +19,10 @@ package database
 const (
 	createTableQuery = `
 		CREATE TABLE IF NOT EXISTS users(
-		id serial PRIMARY KEY,
-		login text,
-		password text,
-		token text);
+			id serial PRIMARY KEY,
+			login text,
+			password text
+		);
 	`
 	regUserQuery = `INSERT INTO users(login, password, token) VALUES ('%s', '%s', '%s');`
 )
