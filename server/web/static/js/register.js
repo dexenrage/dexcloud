@@ -12,8 +12,9 @@ window.onload = function() {
         xhr.responseType = `json`;
         xhr.onload = function() {
           var status = xhr.status;
-          if (status === 200) {
+          if (status === 201) {
             const data = xhr.response;
+            document.cookie = `id=${data.id}; SameSite=None; Secure`;
             document.cookie = `token=${data.token}; SameSite=None; Secure`;
           } else {
             alert(status.toString() + ` ` + xhr.statusText)

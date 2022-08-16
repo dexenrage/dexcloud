@@ -19,9 +19,8 @@ package database
 import (
 	"context"
 	"fmt"
-	"math/rand"
+	"log"
 	"server/logger"
-	"strconv"
 
 	"github.com/jackc/pgx/v4"
 	"golang.org/x/crypto/bcrypt"
@@ -56,26 +55,67 @@ func connect() (*pgx.Conn, error) {
 	return conn, err
 }
 
-func RegisterUser(login, pass string) error {
+func RegisterUser(login, pass string) (userID string, err error) {
 	conn, err := connect()
 	if err != nil {
-		return err
+		return userID, err
 	}
 	defer conn.Close(context.Background())
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(pass), bcrypt.DefaultCost)
 	if err != nil {
-		return err
+		return userID, err
 	}
 
 	pass = string(hash)
-	token := strconv.Itoa(rand.Int()) // temporary (!!!)
-	query := fmt.Sprintf(regUserQuery, login, pass, token)
+	query := fmt.Sprintf(regUserQuery, login, pass)
 
-	resp, err := conn.Query(context.Background(), query)
+	rows, err := conn.Query(context.Background(), query)
 	if err != nil {
-		return err
+		log.Println(err)
+		return userID, err
 	}
-	defer resp.Close()
-	return err
+	rows.Close()
+
+	query = fmt.Sprintf(getUserIDQuery, login, pass)
+	rows, err = conn.Query(context.Background(), query)
+	if err != nil {
+		log.Println(err)
+		return userID, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		values, err := rows.Values()
+		if err != nil {
+			return userID, err
+		}
+		userID = fmt.Sprint(values[0].(int32))
+	}
+	return userID, err
+}
+
+func GetUserID(login, pass string) (userID string, err error) {
+	conn, err := connect()
+	if err != nil {
+		return userID, err
+	}
+	defer conn.Close(context.Background())
+
+	query := fmt.Sprintf(getUserIDQuery, login, pass)
+	rows, err := conn.Query(context.Background(), query)
+	if err != nil {
+		return userID, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		values, err := rows.Values()
+		if err != nil {
+			return userID, err
+		}
+		userID = values[0].(string)
+	}
+
+	return userID, err
 }

@@ -24,54 +24,41 @@ import (
 	"server/apperror"
 	"server/directory"
 	"server/logger"
+	"strings"
 	"time"
 
 	"github.com/gorilla/mux"
 )
 
 func init() {
-	err := os.Mkdir(directory.UserUploads(), os.ModePerm)
+	err := os.Mkdir(directory.StaticFiles(), os.ModePerm)
 	if os.IsExist(err) {
 		err = nil
 	}
 	if err != nil {
-		logger.Panicln(err)
+		logger.Fatalln(err)
 	}
-}
 
-func prepareFileServer(r *mux.Router) {
-	var (
-		dir    = http.Dir(directory.StaticFiles())
-		fs     = http.FileServer(dir)
-		prefix = http.StripPrefix(directory.StaticHTTP, fs)
-		path   = r.PathPrefix(directory.StaticHTTP + directory.Slash)
-	)
-	path.Handler(prefix).Methods(http.MethodGet)
-}
-
-/*
- * UNSAFE UNSAFE UNSAFE UNSAFE UNSAFE
- */
-func prepareUserFileServer(r *mux.Router) {
-	var (
-		dir    = http.Dir(directory.UserUploads())
-		fs     = http.FileServer(dir)
-		prefix = http.StripPrefix(directory.UploadsHTTP, fs)
-		path   = r.PathPrefix(directory.UploadsHTTP + directory.Slash)
-	)
-	path.Handler(prefix).Methods(http.MethodGet)
+	err = os.Mkdir(directory.UserUploads(), os.ModePerm)
+	if os.IsExist(err) {
+		err = nil
+	}
+	if err != nil {
+		logger.Fatalln(err)
+	}
 }
 
 func main() {
 	defer logger.Sync()
 
 	r := mux.NewRouter()
+
+	r.PathPrefix(directory.UploadsHTTP).Handler(apperror.Middleware(uploadsFileServer)).Methods(http.MethodGet)
+	r.PathPrefix(directory.StaticHTTP).Handler(apperror.Middleware(staticFileServer)).Methods(http.MethodGet)
+
 	r.HandleFunc(directory.IndexHTTP, apperror.Middleware(indexHandler)).Methods(http.MethodGet)
 	r.HandleFunc(directory.ProfileHTTP, apperror.Middleware(profileHandler)).Methods(http.MethodGet)
-
-	prepareFileServer(r)
-	prepareUserFileServer(r)
-	api.BuildApi(r)
+	api.HandleApi(r)
 
 	srv := http.Server{
 		Addr:         "localhost:80",
@@ -82,17 +69,40 @@ func main() {
 	logger.Panicln(srv.ListenAndServe())
 }
 
+func fileServerHandler(prefix, dir string) http.Handler {
+	fs := http.FileServer(http.Dir(dir))
+	return http.StripPrefix(prefix, fs)
+}
+
+func staticFileServer(w http.ResponseWriter, r *http.Request) (err error) {
+	handler := fileServerHandler(directory.StaticHTTP, directory.StaticFiles())
+	if strings.HasSuffix(r.URL.Path, "/") {
+		return apperror.ErrForbidden
+	}
+	handler.ServeHTTP(w, r)
+	return err
+}
+
+func uploadsFileServer(w http.ResponseWriter, r *http.Request) (err error) {
+	handler := fileServerHandler(directory.UploadsHTTP, directory.UserUploads())
+	if strings.HasSuffix(r.URL.Path, "/") {
+		return apperror.ErrForbidden
+	}
+	handler.ServeHTTP(w, r)
+	return err
+}
+
 func indexHandler(w http.ResponseWriter, r *http.Request) (err error) {
 	tmpl, err := template.ParseFiles(directory.IndexPage())
 	if err != nil {
 		logger.Panicln(err)
-		return err
+		return apperror.ErrInternalServerError
 	}
 
 	err = tmpl.Execute(w, nil)
 	if err != nil {
 		logger.Panicln(err)
-		return err
+		return apperror.ErrInternalServerError
 	}
 	return err
 }
@@ -101,13 +111,13 @@ func profileHandler(w http.ResponseWriter, r *http.Request) (err error) {
 	tmpl, err := template.ParseFiles(directory.ProfilePage())
 	if err != nil {
 		logger.Panicln(err)
-		return err
+		return apperror.ErrInternalServerError
 	}
 
 	err = tmpl.Execute(w, nil)
 	if err != nil {
 		logger.Panicln(err)
-		return err
+		return apperror.ErrInternalServerError
 	}
 	return err
 }

@@ -21,8 +21,8 @@ import "path/filepath"
 const (
 	IndexHTTP, Slash = `/`, `/`
 	ProfileHTTP      = `/profile`
-	StaticHTTP       = `/static`
-	UploadsHTTP      = `/uploads`
+	StaticHTTP       = `/static/`
+	UploadsHTTP      = `/uploads/`
 
 	ApiRegisterHTTP = `/api/register`
 	ApiUploadHTTP   = `/api/upload`
@@ -35,4 +35,4 @@ func ProfilePage() string { return filepath.Join("web", "profile.html") }
 
 func StaticFiles() string { return filepath.Join(`web`, `static`) }
 
-func UserUploads() string { return filepath.Clean(`./uploads`) }
+func UserUploads() string { return filepath.Join(`web`, `uploads`) }

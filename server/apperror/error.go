@@ -22,8 +22,9 @@ import (
 
 var (
 	ErrBadRequest          = NewError(nil, "Bad Request", "", "US-000400")
-	ErrNotFound            = NewError(nil, "Not Found", "", "US-000404")
 	ErrUnathorized         = NewError(nil, "Unathorized", "", "US-000401")
+	ErrForbidden           = NewError(nil, "Forbidden", "", "US-000403")
+	ErrNotFound            = NewError(nil, "Not Found", "", "US-000404")
 	ErrInternalServerError = NewError(nil, "Internal Server Error", "", "US-000500")
 )
 

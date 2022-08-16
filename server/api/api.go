@@ -20,13 +20,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"path/filepath"
-	"strconv"
 
 	"server/apperror"
+	"server/database"
 	"server/directory"
 	"server/user"
 
@@ -34,20 +33,28 @@ import (
 )
 
 type Account struct {
+	UserID   string `json:"id"`
 	Login    string `json:"login"`
 	Password string `json:"password"`
 }
 
-func BuildApi(r *mux.Router) {
+func HandleApi(r *mux.Router) {
 	r.HandleFunc(directory.ApiRegisterHTTP, apperror.Middleware(registerHandler)).Methods(http.MethodPost)
 	r.HandleFunc(directory.ApiUploadHTTP, apperror.Middleware(uploadHandler)).Methods(http.MethodPost)
 	r.HandleFunc(directory.ApiFileListHTTP, apperror.Middleware(fileListHandler)).Methods(http.MethodGet)
 }
 
 func fileListHandler(w http.ResponseWriter, r *http.Request) (err error) {
-	files, err := user.GetFiles(userDir())
+	userID, err := r.Cookie("id")
 	if err != nil {
-		log.Println(err)
+		if err == http.ErrNoCookie {
+			return apperror.ErrUnathorized
+		}
+		return apperror.ErrBadRequest
+	}
+
+	files, err := user.GetFiles(userDir(userID.Value))
+	if err != nil {
 		apperror.ErrInternalServerError.Err = err
 		return apperror.ErrInternalServerError
 	}
@@ -65,17 +72,8 @@ func fileListHandler(w http.ResponseWriter, r *http.Request) (err error) {
 	return err
 }
 
-// temporary
-func userDir() string {
-	const userID = 1
-	folder := strconv.Itoa(userID)
-	return filepath.Join(directory.UserUploads(), folder)
-}
-
-// temporary
-func userFilePath(filename string) string {
-	dir := userDir()
-	return filepath.Join(dir, filename)
+func userDir(userID string) string {
+	return filepath.Join(directory.UserUploads(), userID)
 }
 
 func registerHandler(w http.ResponseWriter, r *http.Request) (err error) {
@@ -88,7 +86,12 @@ func registerHandler(w http.ResponseWriter, r *http.Request) (err error) {
 		return apperror.ErrInternalServerError
 	}
 
-	//database.RegisterUser(login, pass)
+	userID, err := database.RegisterUser(acc.Login, acc.Password)
+	if err != nil {
+		apperror.ErrInternalServerError.Err = err
+		return apperror.ErrInternalServerError
+	}
+	acc.UserID = userID
 
 	tkn, err := signIn(&acc)
 	if err != nil {
@@ -96,7 +99,7 @@ func registerHandler(w http.ResponseWriter, r *http.Request) (err error) {
 		return apperror.ErrInternalServerError
 	}
 
-	err = os.Mkdir(userDir(), os.ModePerm)
+	err = os.Mkdir(userDir(userID), os.ModePerm)
 	if os.IsExist(err) {
 		err = nil
 	}
@@ -104,7 +107,7 @@ func registerHandler(w http.ResponseWriter, r *http.Request) (err error) {
 		apperror.ErrInternalServerError.Err = err
 		return apperror.ErrInternalServerError
 	}
-	jsonResp := fmt.Sprintf(`{ "token": "%s" }`, tkn)
+	jsonResp := fmt.Sprintf(`{ "id": "%s", "token": "%s" }`, userID, tkn)
 	responseCustomJSON(w, http.StatusCreated, jsonResp)
 	return err
 }
@@ -113,7 +116,8 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) (err error) {
 	// temporary
 	err = checkAuth(w, r)
 	if err != nil {
-		return err
+		apperror.ErrInternalServerError.Err = err
+		return apperror.ErrInternalServerError
 	}
 
 	file, fileHeader, err := r.FormFile("file")
@@ -123,7 +127,16 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) (err error) {
 	}
 	defer file.Close()
 
-	dst, err := os.Create(userFilePath(fileHeader.Filename))
+	userID, err := r.Cookie("id")
+	if err != nil {
+		if err == http.ErrNoCookie {
+			return apperror.ErrUnathorized
+		}
+		return apperror.ErrBadRequest
+	}
+
+	path := filepath.Join(userDir(userID.Value), fileHeader.Filename)
+	dst, err := os.Create(path)
 	if err != nil {
 		apperror.ErrInternalServerError.Err = err
 		return apperror.ErrInternalServerError

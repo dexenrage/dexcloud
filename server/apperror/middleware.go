@@ -33,6 +33,10 @@ func Middleware(h appHandler) http.HandlerFunc {
 					w.WriteHeader(http.StatusBadRequest)
 					w.Write(ErrBadRequest.Marshal())
 					return
+				case errors.Is(err, ErrForbidden):
+					w.WriteHeader(http.StatusForbidden)
+					w.Write(ErrForbidden.Marshal())
+					return
 				case errors.Is(err, ErrNotFound):
 					w.WriteHeader(http.StatusNotFound)
 					w.Write(ErrNotFound.Marshal())

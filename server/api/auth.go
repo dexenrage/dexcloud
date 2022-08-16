@@ -20,7 +20,6 @@ import (
 	"errors"
 	"net/http"
 	"server/apperror"
-	"time"
 
 	"github.com/golang-jwt/jwt/v4"
 )
@@ -33,12 +32,12 @@ type Claims struct {
 }
 
 func signIn(acc *Account) (tokenString string, err error) {
-	expirationTime := jwt.NewNumericDate(time.Now().Add(5 * time.Minute))
+	//expirationTime := jwt.NewNumericDate(time.Now().Add(15 * time.Minute))
 
 	claims := &Claims{
-		Login: acc.Login,
+		Login:            acc.Login,
 		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: expirationTime,
+			//ExpiresAt: expirationTime,
 		},
 	}
 
