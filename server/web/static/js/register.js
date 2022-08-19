@@ -14,8 +14,9 @@ window.onload = function() {
           var status = xhr.status;
           if (status === 201) {
             const data = xhr.response;
-            document.cookie = `id=${data.id}; SameSite=None; Secure`;
+            document.cookie = `userid=${data.userid}; SameSite=None; Secure`;
             document.cookie = `token=${data.token}; SameSite=None; Secure`;
+            window.location.replace("/profile");
           } else {
             alert(status.toString() + ` ` + xhr.statusText)
             return

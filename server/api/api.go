@@ -18,7 +18,6 @@ package api
 
 import (
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -68,7 +67,7 @@ func fileListHandler(w http.ResponseWriter, r *http.Request) (err error) {
 		apperror.ErrInternalServerError.Err = err
 		return apperror.ErrInternalServerError
 	}
-	responseCustomJSON(w, http.StatusOK, string(x))
+	responseCustomJSON(w, http.StatusOK, x)
 	return err
 }
 
@@ -93,13 +92,13 @@ func registerHandler(w http.ResponseWriter, r *http.Request) (err error) {
 	}
 	acc.UserID = userID
 
-	tkn, err := signIn(&acc)
+	token, err := signIn(&acc)
 	if err != nil {
 		apperror.ErrInternalServerError.Err = err
 		return apperror.ErrInternalServerError
 	}
 
-	err = os.Mkdir(userDir(userID), os.ModePerm)
+	err = os.Mkdir(userDir(acc.UserID), os.ModePerm)
 	if os.IsExist(err) {
 		err = nil
 	}
@@ -107,8 +106,19 @@ func registerHandler(w http.ResponseWriter, r *http.Request) (err error) {
 		apperror.ErrInternalServerError.Err = err
 		return apperror.ErrInternalServerError
 	}
-	jsonResp := fmt.Sprintf(`{ "id": "%s", "token": "%s" }`, userID, tkn)
-	responseCustomJSON(w, http.StatusCreated, jsonResp)
+
+	dataMap := map[string]string{
+		"userid": acc.UserID,
+		"token":  token,
+	}
+
+	data, err := json.Marshal(dataMap)
+	if err != nil {
+		apperror.ErrInternalServerError.Err = err
+		return apperror.ErrInternalServerError
+	}
+
+	responseCustomJSON(w, http.StatusCreated, data)
 	return err
 }
 

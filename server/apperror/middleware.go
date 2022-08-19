@@ -30,34 +30,47 @@ func Middleware(h appHandler) http.HandlerFunc {
 			if errors.As(err, &appErr) {
 				switch {
 				case errors.Is(err, ErrBadRequest):
-					w.WriteHeader(http.StatusBadRequest)
-					w.Write(ErrBadRequest.Marshal())
+					response(w, http.StatusBadRequest, ErrBadRequest.Marshal())
 					return
 				case errors.Is(err, ErrForbidden):
-					w.WriteHeader(http.StatusForbidden)
-					w.Write(ErrForbidden.Marshal())
+					response(w, http.StatusForbidden, ErrForbidden.Marshal())
 					return
 				case errors.Is(err, ErrNotFound):
-					w.WriteHeader(http.StatusNotFound)
-					w.Write(ErrNotFound.Marshal())
+					response(w, http.StatusNotFound, ErrNotFound.Marshal())
 					return
 				case errors.Is(err, ErrUnathorized):
-					w.WriteHeader(http.StatusUnauthorized)
-					w.Write(ErrUnathorized.Marshal())
+					response(w, http.StatusUnauthorized, ErrUnathorized.Marshal())
 					return
 				case errors.Is(err, ErrInternalServerError):
-					w.WriteHeader(http.StatusInternalServerError)
-					w.Write(ErrInternalServerError.Marshal())
+					response(w, http.StatusInternalServerError, ErrInternalServerError.Marshal())
 					return
 				default:
 					err := err.(*CustomError)
-					w.WriteHeader(http.StatusBadRequest)
-					w.Write(err.Marshal())
+					response(w, http.StatusBadRequest, err.Marshal())
 					return
 				}
 			}
-			w.WriteHeader(http.StatusTeapot)
-			w.Write(systemError(err).Marshal())
+			responseTeapot(w, err)
 		}
 	})
+}
+
+func response(w http.ResponseWriter, statusCode int, data []byte) {
+	switch {
+	case statusCode == 0:
+		err := errors.New("statusCode is not set or is equal to zero")
+		responseTeapot(w, err)
+		return
+	case data == nil:
+		err := errors.New("response data is nil")
+		responseTeapot(w, err)
+		return
+	}
+	w.WriteHeader(statusCode)
+	w.Write(data)
+}
+
+func responseTeapot(w http.ResponseWriter, err error) {
+	w.WriteHeader(http.StatusTeapot)
+	w.Write(systemError(err).Marshal())
 }

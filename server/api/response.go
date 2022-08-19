@@ -17,8 +17,9 @@ limitations under the License.
 package api
 
 import (
-	"io"
+	"encoding/json"
 	"net/http"
+	"server/logger"
 )
 
 const (
@@ -26,14 +27,21 @@ const (
 	defaultValue = "application/json"
 )
 
-func responseCustomJSON(w http.ResponseWriter, status int, msg string) {
+func responseCustomJSON(w http.ResponseWriter, status int, data []byte) {
 	w.Header().Set(defaultType, defaultValue)
 	w.WriteHeader(status)
-	io.WriteString(w, msg)
+	w.Write(data)
 }
 
 func responseOK(w http.ResponseWriter) {
 	w.Header().Set(defaultType, defaultValue)
 	w.WriteHeader(http.StatusOK)
-	io.WriteString(w, `{ "message": "OK" }`)
+
+	dataMap := map[string]string{"message": "OK"}
+	data, err := json.Marshal(dataMap)
+	if err != nil {
+		logger.Errorln(err)
+		return
+	}
+	w.Write(data)
 }
