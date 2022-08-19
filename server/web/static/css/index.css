@@ -1,0 +1,51 @@
+.register_form {
+    display: flex;
+    inline-size: fit-content;
+    margin: 1cm;
+    gap: 5px;
+}
+
+.register_form.login {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+}
+
+.register_form.password {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+}
+
+.register_form.button {
+    display: flex;
+    flex-direction: column-reverse;
+    margin: 0;
+    width: 60px;
+}
+
+.login_form {
+    display: flex;
+    inline-size: fit-content;
+    margin-left: 1cm;
+    gap: 5px;
+}
+
+.login_form.login {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+}
+
+.login_form.password {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+}
+
+.login_form.button {
+    display: flex;
+    flex-direction: column-reverse;
+    margin: 0;
+    width: 60px;
+}

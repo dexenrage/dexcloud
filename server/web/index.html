@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>DexCloud</title>
-    <link rel="stylesheet" href="/static/css/style.css" type="text/css">
+    <link rel="stylesheet" href="/static/css/index.css" type="text/css">
 </head>
 <!--
     Ребята не стоит вскрывать этот код. Вы молодые, шутливые, вам все легко.
@@ -14,19 +14,32 @@
     Остальные просто не найдут...
 -->
 <body>
-    <form class="register" method="post">
-        <div class="login">
+    <form id="register_form" class="register_form" method="post">
+        <div class="register_form login">
             <label for="login"><b>E-Mail:</b></label>
             <input type="email" name="login" id="login">
         </div>
-        <div class="password">
+        <div class="register_form password">
             <label for="password"><b>Password:</b></label>
             <input type="password" name="password" id="password">
         </div>
-        <div class="submit">
-            <button>Submit</button>
+        <div class="register_form button">
+            <button>Register</button>
         </div>
-        <script src="/static/js/register.js"></script>
     </form>
+    <form id="login_form" class="login_form" method="post">
+        <div class="login_form login">
+            <label for="login"><b>E-Mail:</b></label>
+            <input type="email" name="login" id="login">
+        </div>
+        <div class="login_form password">
+            <label for="password"><b>Pasword:</b></label>
+            <input type="password" name="password" id="password">
+        </div>
+        <div class="login_form button">
+            <button>Login</button>
+        </div>
+    </form>
+    <script src="/static/js/index.js"></script>
 </body>
 </html>

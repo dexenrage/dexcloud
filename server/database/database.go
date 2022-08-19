@@ -55,67 +55,83 @@ func connect() (*pgx.Conn, error) {
 	return conn, err
 }
 
-func RegisterUser(login, pass string) (userID string, err error) {
+func RegisterUser(login, password string) (userID string, err error) {
 	conn, err := connect()
 	if err != nil {
 		return userID, err
 	}
 	defer conn.Close(context.Background())
 
-	hash, err := bcrypt.GenerateFromPassword([]byte(pass), bcrypt.DefaultCost)
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		return userID, err
 	}
 
-	pass = string(hash)
-	query := fmt.Sprintf(regUserQuery, login, pass)
+	password = string(hash)
+	query := fmt.Sprintf(regUserQuery, login, password)
 
-	rows, err := conn.Query(context.Background(), query)
-	if err != nil {
-		log.Println(err)
-		return userID, err
-	}
-	rows.Close()
-
-	query = fmt.Sprintf(getUserIDQuery, login, pass)
-	rows, err = conn.Query(context.Background(), query)
+	resp, err := conn.Query(context.Background(), query)
 	if err != nil {
 		log.Println(err)
 		return userID, err
 	}
-	defer rows.Close()
+	defer resp.Close()
 
-	for rows.Next() {
-		values, err := rows.Values()
-		if err != nil {
-			return userID, err
-		}
-		userID = fmt.Sprint(values[0].(int32))
+	userID, err = GetUserID(login)
+	if err != nil {
+		log.Println(err)
+		return userID, err
 	}
 	return userID, err
 }
 
-func GetUserID(login, pass string) (userID string, err error) {
+func CheckUserData(login, password string) (dbLogin, dbPassword string, err error) {
 	conn, err := connect()
 	if err != nil {
-		return userID, err
+		return dbLogin, dbPassword, err
 	}
 	defer conn.Close(context.Background())
 
-	query := fmt.Sprintf(getUserIDQuery, login, pass)
+	query := fmt.Sprintf(checkUserDataQuery, login)
 	rows, err := conn.Query(context.Background(), query)
 	if err != nil {
-		return userID, err
+		return dbLogin, dbPassword, err
 	}
 	defer rows.Close()
 
 	for rows.Next() {
 		values, err := rows.Values()
 		if err != nil {
+			return dbLogin, dbPassword, err
+		}
+		dbLogin = values[0].(string)
+		dbPassword = values[1].(string)
+	}
+	return dbLogin, dbPassword, err
+}
+
+func GetUserID(login string) (userID string, err error) {
+	conn, err := connect()
+	if err != nil {
+		return userID, err
+	}
+	defer conn.Close(context.Background())
+
+	query := fmt.Sprintf(getUserIDQuery, login)
+	rows, err := conn.Query(context.Background(), query)
+	if err != nil {
+		return userID, err
+	}
+	defer rows.Close()
+
+	var id int32
+	for rows.Next() {
+		values, err := rows.Values()
+		if err != nil {
 			return userID, err
 		}
-		userID = values[0].(string)
+		id = values[0].(int32)
 	}
-
+	userID = fmt.Sprint(id)
 	return userID, err
 }

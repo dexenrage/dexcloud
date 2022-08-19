@@ -39,12 +39,13 @@ type Account struct {
 
 func HandleApi(r *mux.Router) {
 	r.HandleFunc(directory.ApiRegisterHTTP, apperror.Middleware(registerHandler)).Methods(http.MethodPost)
+	r.HandleFunc(directory.ApiLoginHTTP, apperror.Middleware(loginHandler)).Methods(http.MethodPost)
 	r.HandleFunc(directory.ApiUploadHTTP, apperror.Middleware(uploadHandler)).Methods(http.MethodPost)
 	r.HandleFunc(directory.ApiFileListHTTP, apperror.Middleware(fileListHandler)).Methods(http.MethodGet)
 }
 
 func fileListHandler(w http.ResponseWriter, r *http.Request) (err error) {
-	userID, err := r.Cookie("id")
+	userID, err := r.Cookie("userid")
 	if err != nil {
 		if err == http.ErrNoCookie {
 			return apperror.ErrUnathorized
@@ -54,7 +55,6 @@ func fileListHandler(w http.ResponseWriter, r *http.Request) (err error) {
 
 	files, err := user.GetFiles(userDir(userID.Value))
 	if err != nil {
-		apperror.ErrInternalServerError.Err = err
 		return apperror.ErrInternalServerError
 	}
 
@@ -64,7 +64,6 @@ func fileListHandler(w http.ResponseWriter, r *http.Request) (err error) {
 
 	x, err := json.Marshal(data)
 	if err != nil {
-		apperror.ErrInternalServerError.Err = err
 		return apperror.ErrInternalServerError
 	}
 	responseCustomJSON(w, http.StatusOK, x)
@@ -76,35 +75,30 @@ func userDir(userID string) string {
 }
 
 func registerHandler(w http.ResponseWriter, r *http.Request) (err error) {
-	bodyBuffer, _ := io.ReadAll(r.Body)
-	var acc Account
+	bodyBuffer, err := io.ReadAll(r.Body)
+	if err != nil {
+		return apperror.ErrInternalServerError
+	}
 
+	var acc Account
 	err = json.Unmarshal(bodyBuffer, &acc)
 	if err != nil {
-		apperror.ErrInternalServerError.Err = err
 		return apperror.ErrInternalServerError
 	}
 
-	userID, err := database.RegisterUser(acc.Login, acc.Password)
+	acc.UserID, err = database.RegisterUser(acc.Login, acc.Password)
 	if err != nil {
-		apperror.ErrInternalServerError.Err = err
-		return apperror.ErrInternalServerError
-	}
-	acc.UserID = userID
-
-	token, err := signIn(&acc)
-	if err != nil {
-		apperror.ErrInternalServerError.Err = err
 		return apperror.ErrInternalServerError
 	}
 
 	err = os.Mkdir(userDir(acc.UserID), os.ModePerm)
-	if os.IsExist(err) {
-		err = nil
-	}
 	if err != nil {
-		apperror.ErrInternalServerError.Err = err
 		return apperror.ErrInternalServerError
+	}
+
+	token, err := createToken(&acc)
+	if err != nil {
+		return err
 	}
 
 	dataMap := map[string]string{
@@ -114,30 +108,65 @@ func registerHandler(w http.ResponseWriter, r *http.Request) (err error) {
 
 	data, err := json.Marshal(dataMap)
 	if err != nil {
-		apperror.ErrInternalServerError.Err = err
+		return apperror.ErrInternalServerError
+	}
+	responseCustomJSON(w, http.StatusOK, data)
+	return err
+}
+
+func loginHandler(w http.ResponseWriter, r *http.Request) (err error) {
+	bodyBuffer, err := io.ReadAll(r.Body)
+	if err != nil {
 		return apperror.ErrInternalServerError
 	}
 
-	responseCustomJSON(w, http.StatusCreated, data)
+	var acc Account
+	err = json.Unmarshal(bodyBuffer, &acc)
+	if err != nil {
+		return apperror.ErrInternalServerError
+	}
+
+	err = user.CompareLoginData(acc.Login, acc.Password)
+	if err != nil {
+		return err
+	}
+
+	acc.UserID, err = database.GetUserID(acc.Login)
+	if err != nil {
+		return err
+	}
+
+	token, err := createToken(&acc)
+	if err != nil {
+		return err
+	}
+
+	dataMap := map[string]string{
+		"userid": acc.UserID,
+		"token":  token,
+	}
+
+	data, err := json.Marshal(dataMap)
+	if err != nil {
+		return apperror.ErrInternalServerError
+	}
+	responseCustomJSON(w, http.StatusOK, data)
 	return err
 }
 
 func uploadHandler(w http.ResponseWriter, r *http.Request) (err error) {
-	// temporary
-	err = checkAuth(w, r)
+	err = checkToken(w, r)
 	if err != nil {
-		apperror.ErrInternalServerError.Err = err
-		return apperror.ErrInternalServerError
+		return err
 	}
 
 	file, fileHeader, err := r.FormFile("file")
 	if err != nil {
-		apperror.ErrInternalServerError.Err = err
 		return apperror.ErrInternalServerError
 	}
 	defer file.Close()
 
-	userID, err := r.Cookie("id")
+	userID, err := r.Cookie("userid")
 	if err != nil {
 		if err == http.ErrNoCookie {
 			return apperror.ErrUnathorized
@@ -148,14 +177,12 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) (err error) {
 	path := filepath.Join(userDir(userID.Value), fileHeader.Filename)
 	dst, err := os.Create(path)
 	if err != nil {
-		apperror.ErrInternalServerError.Err = err
 		return apperror.ErrInternalServerError
 	}
 	defer dst.Close()
 
 	_, err = io.Copy(dst, file)
 	if err != nil {
-		apperror.ErrInternalServerError.Err = err
 		return apperror.ErrInternalServerError
 	}
 	responseOK(w)

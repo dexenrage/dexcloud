@@ -1,0 +1,5 @@
+.upload {
+    display: flex;
+    inline-size: fit-content;
+    margin: 1cm;
+}

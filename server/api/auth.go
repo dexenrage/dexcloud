@@ -31,7 +31,7 @@ type Claims struct {
 	Login string `json:"login"`
 }
 
-func signIn(acc *Account) (tokenString string, err error) {
+func createToken(acc *Account) (tokenString string, err error) {
 	//expirationTime := jwt.NewNumericDate(time.Now().Add(15 * time.Minute))
 
 	claims := &Claims{
@@ -49,8 +49,7 @@ func signIn(acc *Account) (tokenString string, err error) {
 	return tokenString, err
 }
 
-// temporary
-func checkAuth(w http.ResponseWriter, r *http.Request) (err error) {
+func checkToken(w http.ResponseWriter, r *http.Request) (err error) {
 	c, err := r.Cookie("token")
 	if err != nil {
 		if err == http.ErrNoCookie {

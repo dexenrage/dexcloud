@@ -18,7 +18,31 @@ package user
 
 import (
 	"os"
+	"server/apperror"
+	"server/database"
+
+	"golang.org/x/crypto/bcrypt"
 )
+
+func CompareLoginData(login, password string) (err error) {
+	dbLogin, dbPassword, err := database.CheckUserData(login, password)
+	if err != nil {
+		return apperror.ErrInternalServerError
+	}
+
+	if login != dbLogin {
+		return apperror.ErrUnathorized
+	}
+
+	dbPasswordBytes := []byte(dbPassword)
+	passwordBytes := []byte(password)
+
+	err = bcrypt.CompareHashAndPassword(dbPasswordBytes, passwordBytes)
+	if err != nil {
+		return apperror.ErrUnathorized
+	}
+	return err
+}
 
 func GetFiles(dir string) ([]string, error) {
 	var files []string

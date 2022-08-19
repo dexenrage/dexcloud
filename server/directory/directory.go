@@ -25,6 +25,7 @@ const (
 	UploadsHTTP      = `/uploads/`
 
 	ApiRegisterHTTP = `/api/register`
+	ApiLoginHTTP    = `/api/login`
 	ApiUploadHTTP   = `/api/upload`
 	ApiFileListHTTP = `/api/filelist`
 )
