@@ -18,12 +18,13 @@ package api
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
 
-	"server/apperror"
+	"server/catcherr"
 	"server/database"
 	"server/directory"
 	"server/user"
@@ -38,153 +39,127 @@ type Account struct {
 }
 
 func HandleApi(r *mux.Router) {
-	r.HandleFunc(directory.ApiRegisterHTTP, apperror.Middleware(registerHandler)).Methods(http.MethodPost)
-	r.HandleFunc(directory.ApiLoginHTTP, apperror.Middleware(loginHandler)).Methods(http.MethodPost)
-	r.HandleFunc(directory.ApiUploadHTTP, apperror.Middleware(uploadHandler)).Methods(http.MethodPost)
-	r.HandleFunc(directory.ApiFileListHTTP, apperror.Middleware(fileListHandler)).Methods(http.MethodGet)
+	r.HandleFunc(directory.ApiRegisterHTTP, registerHandler).Methods(http.MethodPost)
+	r.HandleFunc(directory.ApiLoginHTTP, loginHandler).Methods(http.MethodPost)
+	r.HandleFunc(directory.ApiUploadHTTP, uploadHandler).Methods(http.MethodPost)
+	r.HandleFunc(directory.ApiFileListHTTP, fileListHandler).Methods(http.MethodGet)
 }
 
-func fileListHandler(w http.ResponseWriter, r *http.Request) (err error) {
-	userID, err := r.Cookie("userid")
-	if err != nil {
-		if err == http.ErrNoCookie {
-			return apperror.ErrUnathorized
-		}
-		return apperror.ErrBadRequest
-	}
+func getUserDir(userID string) string { return filepath.Join(directory.UserUploads(), userID) }
 
-	files, err := user.GetFiles(userDir(userID.Value))
-	if err != nil {
-		return apperror.ErrInternalServerError
+const (
+	defaultResponseType  = "Content-Type"
+	defaultResponseValue = "application/json"
+)
+
+func customResponse(w http.ResponseWriter, status int, data []byte) {
+	defer catcherr.RecoverState(`api.customResponse`)
+
+	w.Header().Set(defaultResponseType, defaultResponseValue)
+	w.WriteHeader(status)
+
+	_, err := w.Write(data)
+	catcherr.HandleError(w, catcherr.InternalServerError, err)
+}
+
+func fileListHandler(w http.ResponseWriter, r *http.Request) {
+	defer catcherr.RecoverState(`api.fileListHandler`)
+
+	userID, err := r.Cookie("userid")
+	if errors.Is(err, http.ErrNoCookie) {
+		catcherr.HandleError(w, catcherr.Unathorized, err)
 	}
+	catcherr.HandleError(w, catcherr.BadRequest, err)
+
+	files := user.GetFiles(w, getUserDir(userID.Value))
+	catcherr.HandleError(w, catcherr.InternalServerError, err)
 
 	data := map[string]interface{}{
 		"files": files,
 	}
 
 	x, err := json.Marshal(data)
-	if err != nil {
-		return apperror.ErrInternalServerError
-	}
-	responseCustomJSON(w, http.StatusOK, x)
-	return err
+	catcherr.HandleError(w, catcherr.InternalServerError, err)
+	customResponse(w, http.StatusOK, x)
 }
 
-func userDir(userID string) string {
-	return filepath.Join(directory.UserUploads(), userID)
-}
+func registerHandler(w http.ResponseWriter, r *http.Request) {
+	defer catcherr.RecoverState(`api.registerHandler`)
 
-func registerHandler(w http.ResponseWriter, r *http.Request) (err error) {
 	bodyBuffer, err := io.ReadAll(r.Body)
-	if err != nil {
-		return apperror.ErrInternalServerError
-	}
+	catcherr.HandleError(w, catcherr.InternalServerError, err)
 
 	var acc Account
 	err = json.Unmarshal(bodyBuffer, &acc)
-	if err != nil {
-		return apperror.ErrInternalServerError
-	}
+	catcherr.HandleError(w, catcherr.InternalServerError, err)
 
-	acc.UserID, err = database.RegisterUser(acc.Login, acc.Password)
-	if err != nil {
-		return apperror.ErrInternalServerError
-	}
+	acc.Password = user.GeneratePasswordHash(w, acc.Password)
+	acc.UserID = database.RegisterUser(w, acc.Login, acc.Password)
 
-	err = os.Mkdir(userDir(acc.UserID), os.ModePerm)
-	if err != nil {
-		return apperror.ErrInternalServerError
-	}
+	err = os.Mkdir(getUserDir(acc.UserID), os.ModePerm)
+	catcherr.HandleError(w, catcherr.InternalServerError, err)
 
-	token, err := createToken(&acc)
-	if err != nil {
-		return err
-	}
+	token, expiresAt := createToken(w, acc.Login)
 
 	dataMap := map[string]string{
-		"userid": acc.UserID,
-		"token":  token,
+		"userid":  acc.UserID,
+		"token":   token,
+		"expires": expiresAt,
 	}
 
 	data, err := json.Marshal(dataMap)
-	if err != nil {
-		return apperror.ErrInternalServerError
-	}
-	responseCustomJSON(w, http.StatusOK, data)
-	return err
+	catcherr.HandleError(w, catcherr.InternalServerError, err)
+	customResponse(w, http.StatusOK, data)
 }
 
-func loginHandler(w http.ResponseWriter, r *http.Request) (err error) {
+func loginHandler(w http.ResponseWriter, r *http.Request) {
+	defer catcherr.RecoverState(`api.loginHandler`)
+
 	bodyBuffer, err := io.ReadAll(r.Body)
-	if err != nil {
-		return apperror.ErrInternalServerError
-	}
+	catcherr.HandleError(w, catcherr.InternalServerError, err)
 
 	var acc Account
 	err = json.Unmarshal(bodyBuffer, &acc)
-	if err != nil {
-		return apperror.ErrInternalServerError
-	}
+	catcherr.HandleError(w, catcherr.InternalServerError, err)
 
-	err = user.CompareLoginData(acc.Login, acc.Password)
-	if err != nil {
-		return err
-	}
+	user.CompareLoginCredentials(w, acc.Login, acc.Password)
+	acc.UserID = database.GetUserID(w, acc.Login)
 
-	acc.UserID, err = database.GetUserID(acc.Login)
-	if err != nil {
-		return err
-	}
-
-	token, err := createToken(&acc)
-	if err != nil {
-		return err
-	}
+	token, expiresAt := createToken(w, acc.Login)
 
 	dataMap := map[string]string{
-		"userid": acc.UserID,
-		"token":  token,
+		"userid":  acc.UserID,
+		"token":   token,
+		"expires": expiresAt,
 	}
 
 	data, err := json.Marshal(dataMap)
-	if err != nil {
-		return apperror.ErrInternalServerError
-	}
-	responseCustomJSON(w, http.StatusOK, data)
-	return err
+	catcherr.HandleError(w, catcherr.Unathorized, err)
+
+	customResponse(w, http.StatusOK, data)
 }
 
-func uploadHandler(w http.ResponseWriter, r *http.Request) (err error) {
-	err = checkToken(w, r)
-	if err != nil {
-		return err
-	}
+func uploadHandler(w http.ResponseWriter, r *http.Request) {
+	defer catcherr.RecoverState(`api.uploadHandler`)
+	parseToken(w, r)
 
 	file, fileHeader, err := r.FormFile("file")
-	if err != nil {
-		return apperror.ErrInternalServerError
-	}
+	catcherr.HandleError(w, catcherr.InternalServerError, err)
 	defer file.Close()
 
 	userID, err := r.Cookie("userid")
-	if err != nil {
-		if err == http.ErrNoCookie {
-			return apperror.ErrUnathorized
-		}
-		return apperror.ErrBadRequest
+	if errors.Is(err, http.ErrNoCookie) {
+		catcherr.HandleError(w, catcherr.Unathorized, err)
 	}
+	catcherr.HandleError(w, catcherr.BadRequest, err)
 
-	path := filepath.Join(userDir(userID.Value), fileHeader.Filename)
+	path := filepath.Join(getUserDir(userID.Value), fileHeader.Filename)
+
 	dst, err := os.Create(path)
-	if err != nil {
-		return apperror.ErrInternalServerError
-	}
+	catcherr.HandleError(w, catcherr.InternalServerError, err)
 	defer dst.Close()
 
 	_, err = io.Copy(dst, file)
-	if err != nil {
-		return apperror.ErrInternalServerError
-	}
-	responseOK(w)
-	return err
+	catcherr.HandleError(w, catcherr.InternalServerError, err)
+	customResponse(w, http.StatusOK, []byte(`OK`))
 }

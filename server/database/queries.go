@@ -24,7 +24,7 @@ const (
 			password text
 		);
 	`
-	regUserQuery       = `INSERT INTO users(login, password) VALUES ('%s', '%s');`
-	checkUserDataQuery = `SELECT login, password FROM users WHERE login='%s';`
-	getUserIDQuery     = `SELECT id FROM users WHERE login='%s';`
+	regUserQuery             = `INSERT INTO users(login, password) VALUES ('%s', '%s');`
+	getUserPasswordHashQuery = `SELECT password FROM users WHERE login='%s';`
+	getUserIDQuery           = `SELECT id FROM users WHERE login='%s';`
 )

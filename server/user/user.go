@@ -17,42 +17,42 @@ limitations under the License.
 package user
 
 import (
+	"net/http"
 	"os"
-	"server/apperror"
+	"server/catcherr"
 	"server/database"
 
 	"golang.org/x/crypto/bcrypt"
 )
 
-func CompareLoginData(login, password string) (err error) {
-	dbLogin, dbPassword, err := database.CheckUserData(login, password)
-	if err != nil {
-		return apperror.ErrInternalServerError
-	}
+func GeneratePasswordHash(w http.ResponseWriter, password string) (hash string) {
+	defer catcherr.RecoverState(`user.GeneratePasswordHash`)
 
-	if login != dbLogin {
-		return apperror.ErrUnathorized
-	}
+	hashBytes, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	catcherr.HandleError(w, catcherr.InternalServerError, err)
 
-	dbPasswordBytes := []byte(dbPassword)
-	passwordBytes := []byte(password)
-
-	err = bcrypt.CompareHashAndPassword(dbPasswordBytes, passwordBytes)
-	if err != nil {
-		return apperror.ErrUnathorized
-	}
-	return err
+	return string(hashBytes)
 }
 
-func GetFiles(dir string) ([]string, error) {
-	var files []string
+func CompareLoginCredentials(w http.ResponseWriter, login, password string) {
+	defer catcherr.RecoverState(`user.CompareLoginData`)
+	hash := database.GetHashedPassword(w, login)
+
+	hashBytes := []byte(hash)
+	passwordBytes := []byte(password)
+
+	err := bcrypt.CompareHashAndPassword(hashBytes, passwordBytes)
+	catcherr.HandleError(w, catcherr.Unathorized, err)
+}
+
+func GetFiles(w http.ResponseWriter, dir string) (files []string) {
+	defer catcherr.RecoverState(`user.GetFiles`)
 
 	dirEntry, err := os.ReadDir(dir)
-	if err != nil {
-		return nil, err
-	}
+	catcherr.HandleError(w, catcherr.InternalServerError, err)
+
 	for _, f := range dirEntry {
 		files = append(files, f.Name())
 	}
-	return files, err
+	return files
 }

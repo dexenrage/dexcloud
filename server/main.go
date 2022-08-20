@@ -17,11 +17,12 @@ limitations under the License.
 package main
 
 import (
+	"errors"
 	"html/template"
 	"net/http"
 	"os"
 	"server/api"
-	"server/apperror"
+	"server/catcherr"
 	"server/directory"
 	"server/logger"
 	"strings"
@@ -31,34 +32,37 @@ import (
 )
 
 func init() {
-	err := os.Mkdir(directory.StaticFiles(), os.ModePerm)
-	if os.IsExist(err) {
-		err = nil
-	}
-	if err != nil {
-		logger.Fatalln(err)
-	}
+	createCriticalDirectory(directory.StaticFiles())
+	createCriticalDirectory(directory.UserUploads())
+}
 
-	err = os.Mkdir(directory.UserUploads(), os.ModePerm)
-	if os.IsExist(err) {
-		err = nil
-	}
+func createCriticalDirectory(dir string) {
+	err := os.Mkdir(dir, os.ModePerm)
 	if err != nil {
+		if os.IsExist(err) {
+			return
+		}
 		logger.Fatalln(err)
 	}
 }
 
+func initHandlers(r *mux.Router) {
+	// Pages
+	r.HandleFunc(directory.IndexHTTP, indexHandler).Methods(http.MethodGet)
+	r.HandleFunc(directory.ProfileHTTP, profileHandler).Methods(http.MethodGet)
+
+	// FileServers
+	r.PathPrefix(directory.UploadsHTTP).HandlerFunc(uploadsFileServerHandler).Methods(http.MethodGet)
+	r.PathPrefix(directory.StaticHTTP).HandlerFunc(staticFileServerHandler).Methods(http.MethodGet)
+
+	// API
+	api.HandleApi(r)
+}
+
 func main() {
 	defer logger.Sync()
-
 	r := mux.NewRouter()
-
-	r.PathPrefix(directory.UploadsHTTP).Handler(apperror.Middleware(uploadsFileServer)).Methods(http.MethodGet)
-	r.PathPrefix(directory.StaticHTTP).Handler(apperror.Middleware(staticFileServer)).Methods(http.MethodGet)
-
-	r.HandleFunc(directory.IndexHTTP, apperror.Middleware(indexHandler)).Methods(http.MethodGet)
-	r.HandleFunc(directory.ProfileHTTP, apperror.Middleware(profileHandler)).Methods(http.MethodGet)
-	api.HandleApi(r)
+	initHandlers(r)
 
 	srv := http.Server{
 		Addr:         "localhost:80",
@@ -69,55 +73,44 @@ func main() {
 	logger.Panicln(srv.ListenAndServe())
 }
 
-func fileServerHandler(prefix, dir string) http.Handler {
+func getFileServerHandler(w http.ResponseWriter, r *http.Request, prefix, dir string) http.Handler {
+	if strings.HasSuffix(r.URL.Path, "/") {
+		err := errors.New(`The user is not allowed to enter this directory`)
+		catcherr.HandleError(w, catcherr.Forbidden, err)
+	}
+
 	fs := http.FileServer(http.Dir(dir))
 	return http.StripPrefix(prefix, fs)
 }
 
-func staticFileServer(w http.ResponseWriter, r *http.Request) (err error) {
-	handler := fileServerHandler(directory.StaticHTTP, directory.StaticFiles())
-	if strings.HasSuffix(r.URL.Path, "/") {
-		return apperror.ErrForbidden
-	}
+func staticFileServerHandler(w http.ResponseWriter, r *http.Request) {
+	defer catcherr.RecoverState(`main.staticFileServerHandler`)
+	handler := getFileServerHandler(w, r, directory.StaticHTTP, directory.StaticFiles())
 	handler.ServeHTTP(w, r)
-	return err
 }
 
-func uploadsFileServer(w http.ResponseWriter, r *http.Request) (err error) {
-	handler := fileServerHandler(directory.UploadsHTTP, directory.UserUploads())
-	if strings.HasSuffix(r.URL.Path, "/") {
-		return apperror.ErrForbidden
-	}
+func uploadsFileServerHandler(w http.ResponseWriter, r *http.Request) {
+	defer catcherr.RecoverState(`main.uploadsFileServerHandler`)
+	handler := getFileServerHandler(w, r, directory.UploadsHTTP, directory.UserUploads())
 	handler.ServeHTTP(w, r)
-	return err
 }
 
-func indexHandler(w http.ResponseWriter, r *http.Request) (err error) {
+func indexHandler(w http.ResponseWriter, r *http.Request) {
+	defer catcherr.RecoverState(`main.indexHandler`)
+
 	tmpl, err := template.ParseFiles(directory.IndexPage())
-	if err != nil {
-		logger.Panicln(err)
-		return apperror.ErrInternalServerError
-	}
+	catcherr.HandleError(w, catcherr.InternalServerError, err)
 
 	err = tmpl.Execute(w, nil)
-	if err != nil {
-		logger.Panicln(err)
-		return apperror.ErrInternalServerError
-	}
-	return err
+	catcherr.HandleError(w, catcherr.InternalServerError, err)
 }
 
-func profileHandler(w http.ResponseWriter, r *http.Request) (err error) {
+func profileHandler(w http.ResponseWriter, r *http.Request) {
+	defer catcherr.RecoverState(`main.profileHandler`)
+
 	tmpl, err := template.ParseFiles(directory.ProfilePage())
-	if err != nil {
-		logger.Panicln(err)
-		return apperror.ErrInternalServerError
-	}
+	catcherr.HandleError(w, catcherr.InternalServerError, err)
 
 	err = tmpl.Execute(w, nil)
-	if err != nil {
-		logger.Panicln(err)
-		return apperror.ErrInternalServerError
-	}
-	return err
+	catcherr.HandleError(w, catcherr.InternalServerError, err)
 }

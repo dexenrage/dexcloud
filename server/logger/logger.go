@@ -17,7 +17,6 @@ limitations under the License.
 package logger
 
 import (
-	"errors"
 	"fmt"
 
 	"go.uber.org/zap"
@@ -26,22 +25,30 @@ import (
 var logger *zap.SugaredLogger
 
 func init() {
-	lg, err := zap.NewDevelopment()
+	cfg := zap.NewDevelopmentConfig()
+	cfg.DisableCaller = true
+	cfg.DisableStacktrace = true
+
+	lg, err := cfg.Build()
 	if err != nil {
-		msg := `Failed to initialize Zap logger: %v`
-		msg = fmt.Sprintf(msg, err)
-		err = errors.New(msg)
+		err = fmt.Errorf(`Failed to initialize Zap logger: %v`, err)
 		panic(err)
 	}
 	logger = lg.Sugar()
 	defer Sync()
 }
 
-func Sync()             { logger.Sync() }
 func Errorln(err error) { logger.Errorln(err) }
 func Panicln(err error) { logger.Panicln(err) }
 
+func Sync() {
+	err := logger.Sync()
+	if err != nil {
+		logger.Fatalln(err)
+	}
+}
+
 func Fatalln(err error) {
-	logger.Sync()
+	Sync()
 	logger.Fatalln(err)
 }

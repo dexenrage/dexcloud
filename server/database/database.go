@@ -19,11 +19,11 @@ package database
 import (
 	"context"
 	"fmt"
-	"log"
+	"net/http"
+	"server/catcherr"
 	"server/logger"
 
 	"github.com/jackc/pgx/v4"
-	"golang.org/x/crypto/bcrypt"
 )
 
 func init() {
@@ -55,83 +55,62 @@ func connect() (*pgx.Conn, error) {
 	return conn, err
 }
 
-func RegisterUser(login, password string) (userID string, err error) {
+func RegisterUser(w http.ResponseWriter, login, hashedPassword string) (userID string) {
+	defer catcherr.RecoverState(`database.RegisterUser`)
+
 	conn, err := connect()
-	if err != nil {
-		return userID, err
-	}
+	catcherr.HandleError(w, catcherr.InternalServerError, err)
 	defer conn.Close(context.Background())
 
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
-	if err != nil {
-		return userID, err
-	}
-
-	password = string(hash)
-	query := fmt.Sprintf(regUserQuery, login, password)
+	query := fmt.Sprintf(regUserQuery, login, hashedPassword)
 
 	resp, err := conn.Query(context.Background(), query)
-	if err != nil {
-		log.Println(err)
-		return userID, err
-	}
+	catcherr.HandleError(w, catcherr.InternalServerError, err)
 	defer resp.Close()
 
-	userID, err = GetUserID(login)
-	if err != nil {
-		log.Println(err)
-		return userID, err
-	}
-	return userID, err
+	userID = GetUserID(w, login)
+	catcherr.HandleError(w, catcherr.InternalServerError, err)
+	return userID
 }
 
-func CheckUserData(login, password string) (dbLogin, dbPassword string, err error) {
+func GetHashedPassword(w http.ResponseWriter, login string) (hash string) {
+	defer catcherr.RecoverState(`database.GetUserPasswordHash`)
+
 	conn, err := connect()
-	if err != nil {
-		return dbLogin, dbPassword, err
-	}
+	catcherr.HandleError(w, catcherr.InternalServerError, err)
 	defer conn.Close(context.Background())
 
-	query := fmt.Sprintf(checkUserDataQuery, login)
+	query := fmt.Sprintf(getUserPasswordHashQuery, login)
+
 	rows, err := conn.Query(context.Background(), query)
-	if err != nil {
-		return dbLogin, dbPassword, err
-	}
+	catcherr.HandleError(w, catcherr.InternalServerError, err)
 	defer rows.Close()
 
 	for rows.Next() {
 		values, err := rows.Values()
-		if err != nil {
-			return dbLogin, dbPassword, err
-		}
-		dbLogin = values[0].(string)
-		dbPassword = values[1].(string)
+		catcherr.HandleError(w, catcherr.InternalServerError, err)
+		hash = values[0].(string)
 	}
-	return dbLogin, dbPassword, err
+	return hash
 }
 
-func GetUserID(login string) (userID string, err error) {
+func GetUserID(w http.ResponseWriter, login string) (userID string) {
+	defer catcherr.RecoverState(`database.GetUserID`)
+
 	conn, err := connect()
-	if err != nil {
-		return userID, err
-	}
+	catcherr.HandleError(w, catcherr.InternalServerError, err)
 	defer conn.Close(context.Background())
 
 	query := fmt.Sprintf(getUserIDQuery, login)
+
 	rows, err := conn.Query(context.Background(), query)
-	if err != nil {
-		return userID, err
-	}
+	catcherr.HandleError(w, catcherr.InternalServerError, err)
 	defer rows.Close()
 
-	var id int32
 	for rows.Next() {
 		values, err := rows.Values()
-		if err != nil {
-			return userID, err
-		}
-		id = values[0].(int32)
+		catcherr.HandleError(w, catcherr.InternalServerError, err)
+		userID = fmt.Sprint(values[0].(int32))
 	}
-	userID = fmt.Sprint(id)
-	return userID, err
+	return userID
 }

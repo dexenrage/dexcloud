@@ -19,7 +19,8 @@ package api
 import (
 	"errors"
 	"net/http"
-	"server/apperror"
+	"server/catcherr"
+	"time"
 
 	"github.com/golang-jwt/jwt/v4"
 )
@@ -31,51 +32,48 @@ type Claims struct {
 	Login string `json:"login"`
 }
 
-func createToken(acc *Account) (tokenString string, err error) {
-	//expirationTime := jwt.NewNumericDate(time.Now().Add(15 * time.Minute))
+func createToken(w http.ResponseWriter, login string) (token, expiresAt string) {
+	defer catcherr.RecoverState(`api.createToken`)
+	expirationTime := jwt.NewNumericDate(time.Now().Add(15 * time.Minute))
 
 	claims := &Claims{
-		Login:            acc.Login,
+		Login: login,
 		RegisteredClaims: jwt.RegisteredClaims{
-			//ExpiresAt: expirationTime,
+			ExpiresAt: expirationTime,
 		},
 	}
+	tkn := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	tokenString, err = token.SignedString(jwtKey)
-	if err != nil {
-		return tokenString, err
-	}
-	return tokenString, err
+	token, err := tkn.SignedString(jwtKey)
+	catcherr.HandleError(w, catcherr.InternalServerError, err)
+
+	expiresAt = expirationTime.UTC().Format(http.TimeFormat)
+	return token, expiresAt
 }
 
-func checkToken(w http.ResponseWriter, r *http.Request) (err error) {
+func parseToken(w http.ResponseWriter, r *http.Request) {
+	defer catcherr.RecoverState(`api.parseToken`)
+
 	c, err := r.Cookie("token")
-	if err != nil {
-		if err == http.ErrNoCookie {
-			return apperror.ErrUnathorized
-		}
-		return apperror.ErrBadRequest
+	if errors.Is(err, http.ErrNoCookie) {
+		catcherr.HandleError(w, catcherr.Unathorized, err)
 	}
+	catcherr.HandleError(w, catcherr.BadRequest, err)
 
-	tokenString := c.Value
-	claims := &Claims{}
-
-	keyfunc := func(tkn *jwt.Token) (interface{}, error) {
-		return jwtKey, nil
-	}
+	var (
+		tokenString = c.Value
+		claims      = &Claims{}
+		keyfunc     = func(tkn *jwt.Token) (interface{}, error) { return jwtKey, nil }
+	)
 
 	token, err := jwt.ParseWithClaims(tokenString, claims, keyfunc)
 	if errors.Is(err, jwt.ErrSignatureInvalid) {
-		apperror.ErrUnathorized.Err = jwt.ErrSignatureInvalid
-		return apperror.ErrUnathorized
+		catcherr.HandleError(w, catcherr.Unathorized, err)
 	}
-	if err != nil {
-		return apperror.ErrUnathorized
-	}
+	catcherr.HandleError(w, catcherr.BadRequest, err)
+
 	if !token.Valid {
-		apperror.ErrUnathorized.Message = "Invalid token"
-		return apperror.ErrUnathorized
+		err := errors.New(`Invalid token`)
+		catcherr.HandleError(w, catcherr.Unathorized, err)
 	}
-	return err
 }
