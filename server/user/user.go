@@ -17,8 +17,11 @@ limitations under the License.
 package user
 
 import (
+	"io"
+	"mime/multipart"
 	"net/http"
 	"os"
+	"path/filepath"
 	"server/catcherr"
 	"server/database"
 
@@ -43,6 +46,25 @@ func CompareLoginCredentials(w http.ResponseWriter, login, password string) {
 
 	err := bcrypt.CompareHashAndPassword(hashBytes, passwordBytes)
 	catcherr.HandleError(w, catcherr.Unathorized, err)
+}
+
+type FileStruct struct {
+	Directory  string
+	File       multipart.File
+	FileHeader *multipart.FileHeader
+}
+
+func SaveUploadedFile(w http.ResponseWriter, f FileStruct) {
+	defer catcherr.RecoverState(`user.SaveUploadedFile`)
+
+	path := filepath.Join(f.Directory, f.FileHeader.Filename)
+
+	newFile, err := os.Create(path)
+	catcherr.HandleError(w, catcherr.InternalServerError, err)
+	defer newFile.Close()
+
+	_, err = io.Copy(newFile, f.File)
+	catcherr.HandleError(w, catcherr.InternalServerError, err)
 }
 
 func GetFiles(w http.ResponseWriter, dir string) (files []string) {

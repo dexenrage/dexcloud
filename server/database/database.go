@@ -80,7 +80,7 @@ func GetHashedPassword(w http.ResponseWriter, login string) (hash string) {
 	catcherr.HandleError(w, catcherr.InternalServerError, err)
 	defer conn.Close(context.Background())
 
-	query := fmt.Sprintf(getUserPasswordHashQuery, login)
+	query := fmt.Sprintf(getHashedPasswordQuery, login)
 
 	rows, err := conn.Query(context.Background(), query)
 	catcherr.HandleError(w, catcherr.InternalServerError, err)

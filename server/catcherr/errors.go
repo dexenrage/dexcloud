@@ -25,7 +25,7 @@ type (
 
 	Response struct {
 		StatusCode int         `json:"status"`
-		Response   interface{} `json:"data"`
+		Data       interface{} `json:"data"`
 	}
 
 	CustomError struct {

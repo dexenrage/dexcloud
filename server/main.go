@@ -18,6 +18,7 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"html/template"
 	"net/http"
 	"os"
@@ -91,6 +92,17 @@ func staticFileServerHandler(w http.ResponseWriter, r *http.Request) {
 
 func uploadsFileServerHandler(w http.ResponseWriter, r *http.Request) {
 	defer catcherr.RecoverState(`main.uploadsFileServerHandler`)
+
+	var (
+		userID  = api.GetUserID(w, r)
+		userDir = fmt.Sprint(directory.UploadsHTTP, userID, `/`)
+	)
+
+	if !strings.HasPrefix(r.URL.Path, userDir) {
+		err := errors.New(`The user is not allowed to enter this directory`)
+		catcherr.HandleError(w, catcherr.Forbidden, err)
+	}
+
 	handler := getFileServerHandler(w, r, directory.UploadsHTTP, directory.UserUploads())
 	handler.ServeHTTP(w, r)
 }

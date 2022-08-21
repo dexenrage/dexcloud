@@ -18,7 +18,6 @@ package api
 
 import (
 	"encoding/json"
-	"errors"
 	"io"
 	"net/http"
 	"os"
@@ -33,7 +32,7 @@ import (
 )
 
 type Account struct {
-	UserID   string `json:"id"`
+	UserID   string `json:"userid"`
 	Login    string `json:"login"`
 	Password string `json:"password"`
 }
@@ -47,12 +46,7 @@ func HandleApi(r *mux.Router) {
 
 func getUserDir(userID string) string { return filepath.Join(directory.UserUploads(), userID) }
 
-const (
-	defaultResponseType  = "Content-Type"
-	defaultResponseValue = "application/json"
-)
-
-func customResponse(w http.ResponseWriter, status int, data []byte) {
+/*func customResponse(w http.ResponseWriter, status int, data []byte) {
 	defer catcherr.RecoverState(`api.customResponse`)
 
 	w.Header().Set(defaultResponseType, defaultResponseValue)
@@ -60,27 +54,18 @@ func customResponse(w http.ResponseWriter, status int, data []byte) {
 
 	_, err := w.Write(data)
 	catcherr.HandleError(w, catcherr.InternalServerError, err)
-}
+}*/
 
 func fileListHandler(w http.ResponseWriter, r *http.Request) {
-	defer catcherr.RecoverState(`api.fileListHandler`)
-
-	userID, err := r.Cookie("userid")
-	if errors.Is(err, http.ErrNoCookie) {
-		catcherr.HandleError(w, catcherr.Unathorized, err)
-	}
-	catcherr.HandleError(w, catcherr.BadRequest, err)
-
-	files := user.GetFiles(w, getUserDir(userID.Value))
-	catcherr.HandleError(w, catcherr.InternalServerError, err)
-
-	data := map[string]interface{}{
-		"files": files,
-	}
-
-	x, err := json.Marshal(data)
-	catcherr.HandleError(w, catcherr.InternalServerError, err)
-	customResponse(w, http.StatusOK, x)
+	var (
+		userID = GetUserID(w, r)
+		files  = user.GetFiles(w, getUserDir(userID))
+		data   = map[string]interface{}{
+			"userid": userID,
+			"files":  files,
+		}
+	)
+	response.Send(w, http.StatusOK, data)
 }
 
 func registerHandler(w http.ResponseWriter, r *http.Request) {
@@ -99,17 +84,13 @@ func registerHandler(w http.ResponseWriter, r *http.Request) {
 	err = os.Mkdir(getUserDir(acc.UserID), os.ModePerm)
 	catcherr.HandleError(w, catcherr.InternalServerError, err)
 
-	token, expiresAt := createToken(w, acc.Login)
-
-	dataMap := map[string]string{
-		"userid":  acc.UserID,
+	token, expires := createToken(w, acc.Login)
+	data := map[string]string{
+		"login":   acc.Login,
 		"token":   token,
-		"expires": expiresAt,
+		"expires": expires,
 	}
-
-	data, err := json.Marshal(dataMap)
-	catcherr.HandleError(w, catcherr.InternalServerError, err)
-	customResponse(w, http.StatusOK, data)
+	response.Send(w, http.StatusOK, data)
 }
 
 func loginHandler(w http.ResponseWriter, r *http.Request) {
@@ -123,43 +104,29 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 	catcherr.HandleError(w, catcherr.InternalServerError, err)
 
 	user.CompareLoginCredentials(w, acc.Login, acc.Password)
-	acc.UserID = database.GetUserID(w, acc.Login)
 
-	token, expiresAt := createToken(w, acc.Login)
-
-	dataMap := map[string]string{
-		"userid":  acc.UserID,
+	token, expires := createToken(w, acc.Login)
+	data := map[string]string{
+		"login":   acc.Login,
 		"token":   token,
-		"expires": expiresAt,
+		"expires": expires,
 	}
-
-	data, err := json.Marshal(dataMap)
-	catcherr.HandleError(w, catcherr.Unathorized, err)
-
-	customResponse(w, http.StatusOK, data)
+	response.Send(w, http.StatusOK, data)
 }
 
 func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	defer catcherr.RecoverState(`api.uploadHandler`)
-	parseToken(w, r)
+	userID := GetUserID(w, r)
 
 	file, fileHeader, err := r.FormFile("file")
 	catcherr.HandleError(w, catcherr.InternalServerError, err)
 	defer file.Close()
 
-	userID, err := r.Cookie("userid")
-	if errors.Is(err, http.ErrNoCookie) {
-		catcherr.HandleError(w, catcherr.Unathorized, err)
+	f := user.FileStruct{
+		Directory:  getUserDir(userID),
+		File:       file,
+		FileHeader: fileHeader,
 	}
-	catcherr.HandleError(w, catcherr.BadRequest, err)
-
-	path := filepath.Join(getUserDir(userID.Value), fileHeader.Filename)
-
-	dst, err := os.Create(path)
-	catcherr.HandleError(w, catcherr.InternalServerError, err)
-	defer dst.Close()
-
-	_, err = io.Copy(dst, file)
-	catcherr.HandleError(w, catcherr.InternalServerError, err)
-	customResponse(w, http.StatusOK, []byte(`OK`))
+	user.SaveUploadedFile(w, f)
+	response.Send(w, http.StatusOK, `OK`)
 }

@@ -52,10 +52,10 @@ func logError(sender string, data interface{}) {
 func sendErrorData(w http.ResponseWriter, statusCode int, data interface{}) {
 	var resp Response
 	resp.StatusCode = statusCode
-	resp.Response = data
+	resp.Data = data
 
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(statusCode)
+	w.WriteHeader(resp.StatusCode)
 
 	err := json.NewEncoder(w).Encode(resp)
 	if err != nil {

@@ -20,6 +20,7 @@ import (
 	"errors"
 	"net/http"
 	"server/catcherr"
+	"server/database"
 	"time"
 
 	"github.com/golang-jwt/jwt/v4"
@@ -32,7 +33,7 @@ type Claims struct {
 	Login string `json:"login"`
 }
 
-func createToken(w http.ResponseWriter, login string) (token, expiresAt string) {
+func createToken(w http.ResponseWriter, login string) (token, expires string) {
 	defer catcherr.RecoverState(`api.createToken`)
 	expirationTime := jwt.NewNumericDate(time.Now().Add(15 * time.Minute))
 
@@ -47,33 +48,46 @@ func createToken(w http.ResponseWriter, login string) (token, expiresAt string) 
 	token, err := tkn.SignedString(jwtKey)
 	catcherr.HandleError(w, catcherr.InternalServerError, err)
 
-	expiresAt = expirationTime.UTC().Format(http.TimeFormat)
-	return token, expiresAt
+	expires = expirationTime.UTC().Format(http.TimeFormat)
+	return token, expires
 }
 
-func parseToken(w http.ResponseWriter, r *http.Request) {
-	defer catcherr.RecoverState(`api.parseToken`)
-
-	c, err := r.Cookie("token")
+func getCookie(w http.ResponseWriter, r *http.Request, name string) (cookie string) {
+	c, err := r.Cookie(name)
 	if errors.Is(err, http.ErrNoCookie) {
 		catcherr.HandleError(w, catcherr.Unathorized, err)
 	}
 	catcherr.HandleError(w, catcherr.BadRequest, err)
+	return c.Value
+}
 
+func parseToken(w http.ResponseWriter, r *http.Request) {
+	tokenCookie := getCookie(w, r, `token`)
 	var (
-		tokenString = c.Value
-		claims      = &Claims{}
-		keyfunc     = func(tkn *jwt.Token) (interface{}, error) { return jwtKey, nil }
+		claims  = &Claims{}
+		keyfunc = func(tkn *jwt.Token) (interface{}, error) { return jwtKey, nil }
 	)
 
-	token, err := jwt.ParseWithClaims(tokenString, claims, keyfunc)
+	token, err := jwt.ParseWithClaims(tokenCookie, claims, keyfunc)
 	if errors.Is(err, jwt.ErrSignatureInvalid) {
 		catcherr.HandleError(w, catcherr.Unathorized, err)
 	}
 	catcherr.HandleError(w, catcherr.BadRequest, err)
 
+	if login := getCookie(w, r, `login`); claims.Login != login {
+		err := errors.New(`Invalid login`)
+		catcherr.HandleError(w, catcherr.Unathorized, err)
+	}
+
 	if !token.Valid {
 		err := errors.New(`Invalid token`)
 		catcherr.HandleError(w, catcherr.Unathorized, err)
 	}
+}
+
+func GetUserID(w http.ResponseWriter, r *http.Request) (userID string) {
+	defer catcherr.RecoverState(`api.GetUserID`)
+	parseToken(w, r)
+	login := getCookie(w, r, `login`)
+	return database.GetUserID(w, login)
 }
