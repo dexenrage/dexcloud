@@ -18,39 +18,23 @@ package api
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"server/catcherr"
 )
-
-type CustomResponse struct {
-	Status int
-	Data   interface{}
-}
 
 const (
 	defaultResponseType  = "Content-Type"
 	defaultResponseValue = "application/json"
 )
 
-var response CustomResponse
+var response responseData
 
-func (resp *CustomResponse) Send(w http.ResponseWriter, status int, data interface{}) {
+func (*responseData) Send(w http.ResponseWriter, resp responseData) {
 	defer catcherr.RecoverState(`api.response.Send`)
 	w.Header().Set(defaultResponseType, defaultResponseValue)
+	w.WriteHeader(resp.StatusCode)
 
-	resp.Status = status
-	resp.Data = data
-
-	if _, ok := resp.Data.(map[string]interface{}); !ok {
-		if _, ok := resp.Data.(map[string]string); !ok {
-			resp.Data = map[string]string{
-				"data": fmt.Sprint(resp.Data),
-			}
-		}
-	}
-
-	jsonData, err := json.Marshal(resp.Data)
+	jsonData, err := json.Marshal(resp)
 	catcherr.HandleError(w, catcherr.InternalServerError, err)
 
 	_, err = w.Write(jsonData)

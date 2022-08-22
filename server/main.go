@@ -39,10 +39,10 @@ func init() {
 
 func createCriticalDirectory(dir string) {
 	err := os.Mkdir(dir, os.ModePerm)
-	if err != nil {
-		if os.IsExist(err) {
-			return
-		}
+	switch {
+	case os.IsExist(err):
+		return
+	case err != nil:
 		logger.Fatalln(err)
 	}
 }

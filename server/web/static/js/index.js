@@ -13,8 +13,8 @@ window.onload = function() {
         xhr.onload = function() {
           var status = xhr.status;
           if (status === 200) {
-            const data = xhr.response;
-            console.log(data.login);
+            const resp = xhr.response;
+            const data = resp.data
             document.cookie = `login=${data.login}; SameSite=None; Secure`;
             document.cookie = `token=${data.token}; expires=${data.expires}; SameSite=None; Secure`;
             window.location.replace("/profile");
@@ -42,8 +42,9 @@ window.onload = function() {
         xhr.onload = function() {
           var status = xhr.status;
           if (status === 200) {
-            const data = xhr.response;
-            document.cookie = `userid=${data.userid}; SameSite=None; Secure`;
+            const resp = xhr.response;
+            const data = resp.data
+            document.cookie = `login=${data.login}; SameSite=None; Secure`;
             document.cookie = `token=${data.token}; expires=${data.expires}; SameSite=None; Secure`;
             window.location.replace("/profile");
           } else {

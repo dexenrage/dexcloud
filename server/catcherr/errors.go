@@ -18,22 +18,6 @@ package catcherr
 
 import "net/http"
 
-type (
-	Error struct {
-		Error interface{} `json:"error"`
-	}
-
-	Response struct {
-		StatusCode int         `json:"status"`
-		Data       interface{} `json:"data"`
-	}
-
-	CustomError struct {
-		StatusCode  int
-		Description string
-	}
-)
-
 var (
 	BadRequest          CustomError
 	Unathorized         CustomError

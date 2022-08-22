@@ -28,16 +28,11 @@ import (
 
 var jwtKey = []byte(`QHhpZGlvCg==`) // UNSAFE
 
-type Claims struct {
-	jwt.RegisteredClaims
-	Login string `json:"login"`
-}
-
-func createToken(w http.ResponseWriter, login string) (token, expires string) {
+func createToken(w http.ResponseWriter, login string) tokenStruct {
 	defer catcherr.RecoverState(`api.createToken`)
 	expirationTime := jwt.NewNumericDate(time.Now().Add(15 * time.Minute))
 
-	claims := &Claims{
+	claims := &jwtClaims{
 		Login: login,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: expirationTime,
@@ -48,8 +43,13 @@ func createToken(w http.ResponseWriter, login string) (token, expires string) {
 	token, err := tkn.SignedString(jwtKey)
 	catcherr.HandleError(w, catcherr.InternalServerError, err)
 
-	expires = expirationTime.UTC().Format(http.TimeFormat)
-	return token, expires
+	expires := expirationTime.UTC().Format(http.TimeFormat)
+	data := tokenStruct{
+		Login:   login,
+		Token:   token,
+		Expires: expires,
+	}
+	return data
 }
 
 func getCookie(w http.ResponseWriter, r *http.Request, name string) (cookie string) {
@@ -64,7 +64,7 @@ func getCookie(w http.ResponseWriter, r *http.Request, name string) (cookie stri
 func parseToken(w http.ResponseWriter, r *http.Request) {
 	tokenCookie := getCookie(w, r, `token`)
 	var (
-		claims  = &Claims{}
+		claims  = &jwtClaims{}
 		keyfunc = func(tkn *jwt.Token) (interface{}, error) { return jwtKey, nil }
 	)
 

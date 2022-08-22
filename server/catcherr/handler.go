@@ -50,7 +50,7 @@ func logError(sender string, data interface{}) {
 }
 
 func sendErrorData(w http.ResponseWriter, statusCode int, data interface{}) {
-	var resp Response
+	var resp response
 	resp.StatusCode = statusCode
 	resp.Data = data
 

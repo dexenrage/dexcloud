@@ -31,12 +31,6 @@ import (
 	"github.com/gorilla/mux"
 )
 
-type Account struct {
-	UserID   string `json:"userid"`
-	Login    string `json:"login"`
-	Password string `json:"password"`
-}
-
 func HandleApi(r *mux.Router) {
 	r.HandleFunc(directory.ApiRegisterHTTP, registerHandler).Methods(http.MethodPost)
 	r.HandleFunc(directory.ApiLoginHTTP, loginHandler).Methods(http.MethodPost)
@@ -46,26 +40,11 @@ func HandleApi(r *mux.Router) {
 
 func getUserDir(userID string) string { return filepath.Join(directory.UserUploads(), userID) }
 
-/*func customResponse(w http.ResponseWriter, status int, data []byte) {
-	defer catcherr.RecoverState(`api.customResponse`)
-
-	w.Header().Set(defaultResponseType, defaultResponseValue)
-	w.WriteHeader(status)
-
-	_, err := w.Write(data)
-	catcherr.HandleError(w, catcherr.InternalServerError, err)
-}*/
-
 func fileListHandler(w http.ResponseWriter, r *http.Request) {
-	var (
-		userID = GetUserID(w, r)
-		files  = user.GetFiles(w, getUserDir(userID))
-		data   = map[string]interface{}{
-			"userid": userID,
-			"files":  files,
-		}
-	)
-	response.Send(w, http.StatusOK, data)
+	var data fileListStruct
+	data.UserID = GetUserID(w, r)
+	data.Files = user.GetFiles(w, getUserDir(data.UserID))
+	response.Send(w, responseData{http.StatusOK, data})
 }
 
 func registerHandler(w http.ResponseWriter, r *http.Request) {
@@ -74,7 +53,7 @@ func registerHandler(w http.ResponseWriter, r *http.Request) {
 	bodyBuffer, err := io.ReadAll(r.Body)
 	catcherr.HandleError(w, catcherr.InternalServerError, err)
 
-	var acc Account
+	var acc account
 	err = json.Unmarshal(bodyBuffer, &acc)
 	catcherr.HandleError(w, catcherr.InternalServerError, err)
 
@@ -84,13 +63,8 @@ func registerHandler(w http.ResponseWriter, r *http.Request) {
 	err = os.Mkdir(getUserDir(acc.UserID), os.ModePerm)
 	catcherr.HandleError(w, catcherr.InternalServerError, err)
 
-	token, expires := createToken(w, acc.Login)
-	data := map[string]string{
-		"login":   acc.Login,
-		"token":   token,
-		"expires": expires,
-	}
-	response.Send(w, http.StatusOK, data)
+	data := createToken(w, acc.Login)
+	response.Send(w, responseData{http.StatusOK, data})
 }
 
 func loginHandler(w http.ResponseWriter, r *http.Request) {
@@ -99,19 +73,14 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 	bodyBuffer, err := io.ReadAll(r.Body)
 	catcherr.HandleError(w, catcherr.InternalServerError, err)
 
-	var acc Account
+	var acc account
 	err = json.Unmarshal(bodyBuffer, &acc)
 	catcherr.HandleError(w, catcherr.InternalServerError, err)
 
 	user.CompareLoginCredentials(w, acc.Login, acc.Password)
 
-	token, expires := createToken(w, acc.Login)
-	data := map[string]string{
-		"login":   acc.Login,
-		"token":   token,
-		"expires": expires,
-	}
-	response.Send(w, http.StatusOK, data)
+	data := createToken(w, acc.Login)
+	response.Send(w, responseData{http.StatusOK, data})
 }
 
 func uploadHandler(w http.ResponseWriter, r *http.Request) {
@@ -128,5 +97,5 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 		FileHeader: fileHeader,
 	}
 	user.SaveUploadedFile(w, f)
-	response.Send(w, http.StatusOK, `OK`)
+	response.Send(w, responseData{http.StatusOK, `OK`})
 }

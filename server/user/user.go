@@ -18,7 +18,6 @@ package user
 
 import (
 	"io"
-	"mime/multipart"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -46,12 +45,6 @@ func CompareLoginCredentials(w http.ResponseWriter, login, password string) {
 
 	err := bcrypt.CompareHashAndPassword(hashBytes, passwordBytes)
 	catcherr.HandleError(w, catcherr.Unathorized, err)
-}
-
-type FileStruct struct {
-	Directory  string
-	File       multipart.File
-	FileHeader *multipart.FileHeader
 }
 
 func SaveUploadedFile(w http.ResponseWriter, f FileStruct) {
