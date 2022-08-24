@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Регистрация</title>
+    <link rel="stylesheet" href="/static/css/auth.css" type="text/css">
+</head>
+
+<body>
+    <script src="/static/js/header.js"></script>
+    <form class="auth_form" id="register_form" method="post">
+        <b>Регистрация</b>
+
+        <label for="login"><b>Почта:</b></label>
+        <input placeholder="example@example.com" type="email" id="login">
+
+        <label for="password"><b>Пароль:</b></label>
+        <input placeholder="***********" type="password" id="password">
+
+        <button>Регистрация</button>
+
+        <p class="auth_link">
+            Уже зарегистрированы?
+            <a href="/login">
+                <b>Войти</b>
+            </a>
+        </p>
+    </form>
+    <script src="/static/js/auth.js"></script>
+</body>

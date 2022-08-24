@@ -1,11 +1,11 @@
-window.onload = function() {
+window.onload = function () {
     function getFileList() {
         var xhr = new XMLHttpRequest();
         xhr.open("get", "/api/filelist");
         xhr.setRequestHeader('Content-Type', 'application/json');
-        
+
         xhr.responseType = `json`;
-        xhr.onload = function() {
+        xhr.onload = function () {
             var status = xhr.status
             if (status === 200) {
                 const resp = xhr.response;

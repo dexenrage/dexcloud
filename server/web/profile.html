@@ -1,18 +1,22 @@
 <!DOCTYPE html>
-<html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <title>Profile</title>
-        <link rel="stylesheet" href="/static/css/profile.css" type="text/css">
-    </head>
-    <body>
-        <form class="upload" action="/api/upload" method="post" enctype="multipart/form-data">
-            <input type="file" name="file">
-            <input type="submit" formenctype="multipart/form-data" value="Upload">
-        </form>
-        <form class="files" method="get">
-            <script src="/static/js/profile.js"></script>
-            <ul id="list"></ul>
-        </form>
-    </body>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Профиль</title>
+    <link rel="stylesheet" href="/static/css/profile.css" type="text/css">
+</head>
+
+<body>
+    <form class="upload" action="/api/upload" method="post" enctype="multipart/form-data">
+        <input type="file" name="file">
+        <input type="submit" formenctype="multipart/form-data" value="Upload">
+    </form>
+    <form class="files" method="get">
+        <script src="/static/js/profile.js"></script>
+        <ul id="list"></ul>
+    </form>
+    <script src="/static/js/header.js"></script>
+</body>
+
 </html>

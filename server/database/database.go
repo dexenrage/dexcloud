@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"net/http"
 	"server/catcherr"
-	"server/logger"
 
 	"github.com/jackc/pgx/v4"
 )
@@ -29,13 +28,13 @@ import (
 func init() {
 	conn, err := connect()
 	if err != nil {
-		logger.Panicln(err)
+		panic(err)
 	}
 	defer conn.Close(context.Background())
 
 	resp, err := conn.Query(context.Background(), createTableQuery)
 	if err != nil {
-		logger.Panicln(err)
+		panic(err)
 	}
 	defer resp.Close()
 }

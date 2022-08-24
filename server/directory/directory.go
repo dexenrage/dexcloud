@@ -20,6 +20,8 @@ import "path/filepath"
 
 const (
 	IndexHTTP, Slash = `/`, `/`
+	RegisterHTTP     = `/register`
+	LoginHTTP        = `/login`
 	ProfileHTTP      = `/profile`
 	StaticHTTP       = `/static/`
 	UploadsHTTP      = `/uploads/`
@@ -31,6 +33,10 @@ const (
 )
 
 func IndexPage() string { return filepath.Join("web", "index.html") }
+
+func RegisterPage() string { return filepath.Join("web", "register.html") }
+
+func LoginPage() string { return filepath.Join("web", "login.html") }
 
 func ProfilePage() string { return filepath.Join("web", "profile.html") }
 
