@@ -9,16 +9,18 @@
 
 <body>
     <script src="/static/js/header.js"></script>
+    <script src="/static/js/auth.js"></script>
     <form class="auth_form" id="register_form" method="post">
+
         <b>Регистрация</b>
 
         <label for="login"><b>Почта:</b></label>
-        <input placeholder="example@example.com" type="email" id="login">
+        <input placeholder="example@example.com" type="email" id="login" name="login">
 
         <label for="password"><b>Пароль:</b></label>
-        <input placeholder="***********" type="password" id="password">
+        <input placeholder="***********" type="password" id="password" name="password">
 
-        <button>Регистрация</button>
+        <button>Создать аккаунт</button>
 
         <p class="auth_link">
             Уже зарегистрированы?
@@ -27,5 +29,4 @@
             </a>
         </p>
     </form>
-    <script src="/static/js/auth.js"></script>
 </body>

@@ -18,98 +18,48 @@ package database
 
 import (
 	"context"
-	"fmt"
+	"database/sql"
+	"log"
 	"net/http"
 	"server/catcherr"
 
-	"github.com/jackc/pgx/v4"
+	"github.com/uptrace/bun"
+	"github.com/uptrace/bun/dialect/pgdialect"
+	"github.com/uptrace/bun/driver/pgdriver"
+	"github.com/uptrace/bun/extra/bundebug"
 )
 
-func init() {
-	conn, err := connect()
-	if err != nil {
-		panic(err)
-	}
-	defer conn.Close(context.Background())
+var db *bun.DB
 
-	resp, err := conn.Query(context.Background(), createTableQuery)
+func Connect(ctx context.Context) {
+	// Open a PostgreSQL database.
+	dsn := "postgres://postgres:123456@localhost:5432/users?sslmode=disable"
+	pgdb := sql.OpenDB(pgdriver.NewConnector(pgdriver.WithDSN(dsn)))
+
+	// Create a Bun db on top of it.
+	db = bun.NewDB(pgdb, pgdialect.New())
+
+	// Print all queries to stdout.
+	db.AddQueryHook(bundebug.NewQueryHook(bundebug.WithVerbose(true)))
+
+	_, err := db.NewCreateTable().Model((*User)(nil)).IfNotExists().Exec(ctx)
 	if err != nil {
-		panic(err)
+		log.Panicln(err)
 	}
-	defer resp.Close()
 }
 
-func connect() (*pgx.Conn, error) {
-	const auth = "user=postgres password=123456 host=localhost port=5432 dbname=users"
+func RegisterUser(ctx context.Context, w http.ResponseWriter, user User) User {
+	_, err := db.NewInsert().Model(&user).Exec(ctx)
+	catcherr.HandleError(w, catcherr.InternalServerError, err)
 
-	cs, err := pgx.ParseConfig(auth)
-	if err != nil {
-		return nil, err
-	}
-
-	conn, err := pgx.ConnectConfig(context.Background(), cs)
-	if err != nil {
-		return nil, err
-	}
-	return conn, err
+	return GetUserInfo(ctx, w, user.Login)
 }
 
-func RegisterUser(w http.ResponseWriter, login, hashedPassword string) (userID string) {
-	defer catcherr.RecoverState(`database.RegisterUser`)
+func GetUserInfo(ctx context.Context, w http.ResponseWriter, login string) User {
+	u := new(User)
 
-	conn, err := connect()
+	err := db.NewSelect().Model(u).Where(`login = ?`, login).Scan(ctx)
 	catcherr.HandleError(w, catcherr.InternalServerError, err)
-	defer conn.Close(context.Background())
 
-	query := fmt.Sprintf(regUserQuery, login, hashedPassword)
-
-	resp, err := conn.Query(context.Background(), query)
-	catcherr.HandleError(w, catcherr.InternalServerError, err)
-	defer resp.Close()
-
-	userID = GetUserID(w, login)
-	catcherr.HandleError(w, catcherr.InternalServerError, err)
-	return userID
-}
-
-func GetHashedPassword(w http.ResponseWriter, login string) (hash string) {
-	defer catcherr.RecoverState(`database.GetUserPasswordHash`)
-
-	conn, err := connect()
-	catcherr.HandleError(w, catcherr.InternalServerError, err)
-	defer conn.Close(context.Background())
-
-	query := fmt.Sprintf(getHashedPasswordQuery, login)
-
-	rows, err := conn.Query(context.Background(), query)
-	catcherr.HandleError(w, catcherr.InternalServerError, err)
-	defer rows.Close()
-
-	for rows.Next() {
-		values, err := rows.Values()
-		catcherr.HandleError(w, catcherr.InternalServerError, err)
-		hash = values[0].(string)
-	}
-	return hash
-}
-
-func GetUserID(w http.ResponseWriter, login string) (userID string) {
-	defer catcherr.RecoverState(`database.GetUserID`)
-
-	conn, err := connect()
-	catcherr.HandleError(w, catcherr.InternalServerError, err)
-	defer conn.Close(context.Background())
-
-	query := fmt.Sprintf(getUserIDQuery, login)
-
-	rows, err := conn.Query(context.Background(), query)
-	catcherr.HandleError(w, catcherr.InternalServerError, err)
-	defer rows.Close()
-
-	for rows.Next() {
-		values, err := rows.Values()
-		catcherr.HandleError(w, catcherr.InternalServerError, err)
-		userID = fmt.Sprint(values[0].(int32))
-	}
-	return userID
+	return *u
 }

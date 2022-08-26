@@ -16,15 +16,13 @@ limitations under the License.
 
 package database
 
-const (
-	createTableQuery = `
-		CREATE TABLE IF NOT EXISTS users(
-			id serial PRIMARY KEY,
-			login text,
-			password text
-		);
-	`
-	regUserQuery           = `INSERT INTO users(login, password) VALUES ('%s', '%s');`
-	getHashedPasswordQuery = `SELECT password FROM users WHERE login='%s';`
-	getUserIDQuery         = `SELECT id FROM users WHERE login='%s';`
+import "github.com/uptrace/bun"
+
+type (
+	User struct {
+		bun.BaseModel  `bun:"table:users,alias:u"`
+		ID             int64  `bun:"id,pk,autoincrement"`
+		Login          string `bun:"login,notnull" json:"login"`
+		HashedPassword string `bun:"password,notnull" json:"password"`
+	}
 )

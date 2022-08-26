@@ -9,14 +9,14 @@
 
 <body>
     <script src="/static/js/header.js"></script>
-    <form class="auth_form" id="login_form" method="post">
+    <form class="auth_form" id="login_form" method="post" enctype="multipart/form-data">
         <b>Вход</b>
 
         <label for="login"><b>Почта:</b></label>
-        <input placeholder="example@example.com" type="email" id="login">
+        <input placeholder="example@example.com" type="email" id="login" name="login">
 
         <label for="password"><b>Пароль:</b></label>
-        <input placeholder="***********" type="password" id="password">
+        <input placeholder="***********" type="password" id="password" name="password">
 
         <button>Войти</button>
 

@@ -17,6 +17,7 @@ limitations under the License.
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"server/catcherr"
@@ -29,7 +30,7 @@ const (
 
 var response responseData
 
-func (*responseData) Send(w http.ResponseWriter, resp responseData) {
+func (*responseData) Send(ctx context.Context, w http.ResponseWriter, resp responseData) {
 	defer catcherr.RecoverState(`api.response.Send`)
 	w.Header().Set(defaultResponseType, defaultResponseValue)
 	w.WriteHeader(resp.StatusCode)

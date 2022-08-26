@@ -17,11 +17,14 @@ limitations under the License.
 package api
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
+	"time"
 
 	"server/catcherr"
 	"server/database"
@@ -31,61 +34,90 @@ import (
 	"github.com/gorilla/mux"
 )
 
-func HandleApi(r *mux.Router) {
+func HandleApi(ctx context.Context, r *mux.Router) {
+	r.HandleFunc(directory.ApiCheckAuthHTTP, checkAuthHandler).Methods(http.MethodGet)
 	r.HandleFunc(directory.ApiRegisterHTTP, registerHandler).Methods(http.MethodPost)
 	r.HandleFunc(directory.ApiLoginHTTP, loginHandler).Methods(http.MethodPost)
 	r.HandleFunc(directory.ApiUploadHTTP, uploadHandler).Methods(http.MethodPost)
 	r.HandleFunc(directory.ApiFileListHTTP, fileListHandler).Methods(http.MethodGet)
 }
 
+func defaultContextTimeout() (context.Context, context.CancelFunc) {
+	return context.WithTimeout(context.Background(), 5000*time.Second)
+}
+
 func getUserDir(userID string) string { return filepath.Join(directory.UserUploads(), userID) }
 
 func fileListHandler(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := defaultContextTimeout()
+	defer cancel()
+
 	var data fileListStruct
-	data.UserID = GetUserID(w, r)
-	data.Files = user.GetFiles(w, getUserDir(data.UserID))
-	response.Send(w, responseData{http.StatusOK, data})
+	data.UserID = GetUserID(ctx, w, r)
+	data.Files = user.GetFiles(ctx, w, getUserDir(data.UserID))
+
+	response.Send(ctx, w, responseData{http.StatusOK, data})
+}
+
+func checkAuthHandler(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := defaultContextTimeout()
+	defer cancel()
+
+	defer catcherr.RecoverState(`api.checkAuthHandler`)
+	parseToken(ctx, w, r)
+	response.Send(ctx, w, responseData{http.StatusOK, `Authorized`})
 }
 
 func registerHandler(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := defaultContextTimeout()
+	defer cancel()
+
 	defer catcherr.RecoverState(`api.registerHandler`)
 
 	bodyBuffer, err := io.ReadAll(r.Body)
 	catcherr.HandleError(w, catcherr.InternalServerError, err)
 
-	var acc account
+	var acc database.User
 	err = json.Unmarshal(bodyBuffer, &acc)
 	catcherr.HandleError(w, catcherr.InternalServerError, err)
 
-	acc.Password = user.GeneratePasswordHash(w, acc.Password)
-	acc.UserID = database.RegisterUser(w, acc.Login, acc.Password)
+	acc.HashedPassword = user.GeneratePasswordHash(ctx, w, acc.HashedPassword)
+	acc = database.RegisterUser(ctx, w, acc)
 
-	err = os.Mkdir(getUserDir(acc.UserID), os.ModePerm)
+	userID := fmt.Sprint(acc.ID)
+
+	err = os.Mkdir(getUserDir(userID), os.ModePerm)
 	catcherr.HandleError(w, catcherr.InternalServerError, err)
 
-	data := createToken(w, acc.Login)
-	response.Send(w, responseData{http.StatusOK, data})
+	data := createToken(ctx, w, acc.Login)
+	response.Send(ctx, w, responseData{http.StatusOK, data})
 }
 
 func loginHandler(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := defaultContextTimeout()
+	defer cancel()
+
 	defer catcherr.RecoverState(`api.loginHandler`)
 
 	bodyBuffer, err := io.ReadAll(r.Body)
 	catcherr.HandleError(w, catcherr.InternalServerError, err)
 
-	var acc account
+	var acc database.User
 	err = json.Unmarshal(bodyBuffer, &acc)
 	catcherr.HandleError(w, catcherr.InternalServerError, err)
 
-	user.CompareLoginCredentials(w, acc.Login, acc.Password)
+	user.CompareLoginCredentials(ctx, w, acc.Login, acc.HashedPassword)
 
-	data := createToken(w, acc.Login)
-	response.Send(w, responseData{http.StatusOK, data})
+	data := createToken(ctx, w, acc.Login)
+	response.Send(ctx, w, responseData{http.StatusOK, data})
 }
 
 func uploadHandler(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	defer catcherr.RecoverState(`api.uploadHandler`)
-	userID := GetUserID(w, r)
+	userID := GetUserID(ctx, w, r)
 
 	file, fileHeader, err := r.FormFile("file")
 	catcherr.HandleError(w, catcherr.InternalServerError, err)
@@ -96,6 +128,6 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 		File:       file,
 		FileHeader: fileHeader,
 	}
-	user.SaveUploadedFile(w, f)
-	response.Send(w, responseData{http.StatusOK, `OK`})
+	user.SaveUploadedFile(ctx, w, f)
+	response.Send(ctx, w, responseData{http.StatusOK, `OK`})
 }

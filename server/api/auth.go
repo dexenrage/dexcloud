@@ -17,7 +17,9 @@ limitations under the License.
 package api
 
 import (
+	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"server/catcherr"
 	"server/database"
@@ -28,7 +30,7 @@ import (
 
 var jwtKey = []byte(`QHhpZGlvCg==`) // UNSAFE
 
-func createToken(w http.ResponseWriter, login string) tokenStruct {
+func createToken(ctx context.Context, w http.ResponseWriter, login string) tokenStruct {
 	defer catcherr.RecoverState(`api.createToken`)
 	expirationTime := jwt.NewNumericDate(time.Now().Add(15 * time.Minute))
 
@@ -52,7 +54,7 @@ func createToken(w http.ResponseWriter, login string) tokenStruct {
 	return data
 }
 
-func getCookie(w http.ResponseWriter, r *http.Request, name string) (cookie string) {
+func getCookie(ctx context.Context, w http.ResponseWriter, r *http.Request, name string) (cookie string) {
 	c, err := r.Cookie(name)
 	if errors.Is(err, http.ErrNoCookie) {
 		catcherr.HandleError(w, catcherr.Unathorized, err)
@@ -61,8 +63,8 @@ func getCookie(w http.ResponseWriter, r *http.Request, name string) (cookie stri
 	return c.Value
 }
 
-func parseToken(w http.ResponseWriter, r *http.Request) {
-	tokenCookie := getCookie(w, r, `token`)
+func parseToken(ctx context.Context, w http.ResponseWriter, r *http.Request) {
+	tokenCookie := getCookie(ctx, w, r, `token`)
 	var (
 		claims  = &jwtClaims{}
 		keyfunc = func(tkn *jwt.Token) (interface{}, error) { return jwtKey, nil }
@@ -74,7 +76,7 @@ func parseToken(w http.ResponseWriter, r *http.Request) {
 	}
 	catcherr.HandleError(w, catcherr.BadRequest, err)
 
-	if login := getCookie(w, r, `login`); claims.Login != login {
+	if claims.Login != getCookie(ctx, w, r, `login`) {
 		err := errors.New(`Invalid login`)
 		catcherr.HandleError(w, catcherr.Unathorized, err)
 	}
@@ -85,9 +87,13 @@ func parseToken(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func GetUserID(w http.ResponseWriter, r *http.Request) (userID string) {
+func GetUserID(ctx context.Context, w http.ResponseWriter, r *http.Request) (userID string) {
 	defer catcherr.RecoverState(`api.GetUserID`)
-	parseToken(w, r)
-	login := getCookie(w, r, `login`)
-	return database.GetUserID(w, login)
+	parseToken(ctx, w, r)
+
+	var (
+		login = getCookie(ctx, w, r, `login`)
+		id    = database.GetUserInfo(ctx, w, login).ID // int64
+	)
+	return fmt.Sprint(id)
 }

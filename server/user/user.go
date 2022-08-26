@@ -17,6 +17,7 @@ limitations under the License.
 package user
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"os"
@@ -27,7 +28,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-func GeneratePasswordHash(w http.ResponseWriter, password string) (hash string) {
+func GeneratePasswordHash(ctx context.Context, w http.ResponseWriter, password string) (hash string) {
 	defer catcherr.RecoverState(`user.GeneratePasswordHash`)
 
 	hashBytes, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
@@ -36,9 +37,9 @@ func GeneratePasswordHash(w http.ResponseWriter, password string) (hash string) 
 	return string(hashBytes)
 }
 
-func CompareLoginCredentials(w http.ResponseWriter, login, password string) {
+func CompareLoginCredentials(ctx context.Context, w http.ResponseWriter, login, password string) {
 	defer catcherr.RecoverState(`user.CompareLoginData`)
-	hash := database.GetHashedPassword(w, login)
+	hash := database.GetUserInfo(ctx, w, login).HashedPassword
 
 	hashBytes := []byte(hash)
 	passwordBytes := []byte(password)
@@ -47,7 +48,7 @@ func CompareLoginCredentials(w http.ResponseWriter, login, password string) {
 	catcherr.HandleError(w, catcherr.Unathorized, err)
 }
 
-func SaveUploadedFile(w http.ResponseWriter, f FileStruct) {
+func SaveUploadedFile(ctx context.Context, w http.ResponseWriter, f FileStruct) {
 	defer catcherr.RecoverState(`user.SaveUploadedFile`)
 
 	path := filepath.Join(f.Directory, f.FileHeader.Filename)
@@ -60,7 +61,7 @@ func SaveUploadedFile(w http.ResponseWriter, f FileStruct) {
 	catcherr.HandleError(w, catcherr.InternalServerError, err)
 }
 
-func GetFiles(w http.ResponseWriter, dir string) (files []string) {
+func GetFiles(ctx context.Context, w http.ResponseWriter, dir string) (files []string) {
 	defer catcherr.RecoverState(`user.GetFiles`)
 
 	dirEntry, err := os.ReadDir(dir)

@@ -16,7 +16,10 @@ limitations under the License.
 
 package directory
 
-import "path/filepath"
+import (
+	"os"
+	"path/filepath"
+)
 
 const (
 	IndexHTTP, Slash = `/`, `/`
@@ -26,20 +29,42 @@ const (
 	StaticHTTP       = `/static/`
 	UploadsHTTP      = `/uploads/`
 
-	ApiRegisterHTTP = `/api/register`
-	ApiLoginHTTP    = `/api/login`
-	ApiUploadHTTP   = `/api/upload`
-	ApiFileListHTTP = `/api/filelist`
+	ApiCheckAuthHTTP = `/api/checkauth`
+	ApiRegisterHTTP  = `/api/register`
+	ApiLoginHTTP     = `/api/login`
+	ApiUploadHTTP    = `/api/upload`
+	ApiFileListHTTP  = `/api/filelist`
+
+	StaticFilesRoot = "web"
+	UserUploadsRoot = "userdata"
 )
 
-func IndexPage() string { return filepath.Join("web", "index.html") }
+func IndexPage() string { return filepath.Join(StaticFilesRoot, "index.html") }
 
-func RegisterPage() string { return filepath.Join("web", "register.html") }
+func RegisterPage() string { return filepath.Join(StaticFilesRoot, "register.html") }
 
-func LoginPage() string { return filepath.Join("web", "login.html") }
+func LoginPage() string { return filepath.Join(StaticFilesRoot, "login.html") }
 
-func ProfilePage() string { return filepath.Join("web", "profile.html") }
+func ProfilePage() string { return filepath.Join(StaticFilesRoot, "profile.html") }
 
-func StaticFiles() string { return filepath.Join(`web`, `static`) }
+func StaticFiles() string { return filepath.Join(StaticFilesRoot, `static`) }
 
-func UserUploads() string { return filepath.Join(`web`, `uploads`) }
+func UserUploads() string { return filepath.Join(UserUploadsRoot, `uploads`) }
+
+func CreateCriticalDirectories() {
+	directories := []string{
+		StaticFilesRoot,
+		StaticFiles(),
+		UserUploadsRoot,
+		UserUploads(),
+	}
+
+	for _, v := range directories {
+		err := os.Mkdir(v, os.ModePerm)
+		switch {
+		case os.IsExist(err):
+		case err != nil:
+			panic(err)
+		}
+	}
+}

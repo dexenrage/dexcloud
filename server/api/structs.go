@@ -19,12 +19,6 @@ package api
 import "github.com/golang-jwt/jwt/v4"
 
 type (
-	account struct {
-		UserID   string `json:"userid"`
-		Login    string `json:"login"`
-		Password string `json:"password"`
-	}
-
 	fileListStruct struct {
 		UserID string   `json:"userid"`
 		Files  []string `json:"files,omitempty"`

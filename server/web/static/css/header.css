@@ -7,7 +7,7 @@ html,
 body {
     position: absolute;
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
     width: 100%;
     height: 100%;
     padding: 0;
@@ -37,31 +37,31 @@ body {
 
 
 .header-auth-link {
-    position: absolute;
+    display: flex;
     flex-direction: column;
+    position: absolute;
     align-self: center;
-    transform: scale(0.76);
-    right: 0%;
+    right: 5px;
     text-decoration-line: none;
-    width: fit-content;
-    height: fit-content;
-
+    cursor: pointer;
 }
+
 
 
 .header-auth-link img {
+    width: 32px;
+    height: 32px;
+    transform: scale(1.4);
     position: relative;
-    display: table-cell;
-    vertical-align: middle;
-    transform: scale(1.3);
+    align-self: center;
 }
 
 .header-auth-link b {
-    position: relative;
-    display: table-cell;
     font-family: fantasy;
-    font-size: 20px;
+    position: relative;
     text-align: center;
     align-self: center;
+    font-size: smaller;
+    transform: scale(0.9);
     color: black;
 }

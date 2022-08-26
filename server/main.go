@@ -17,14 +17,15 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"html/template"
 	"log"
 	"net/http"
-	"os"
 	"server/api"
 	"server/catcherr"
+	"server/database"
 	"server/directory"
 	"strings"
 	"time"
@@ -33,21 +34,10 @@ import (
 )
 
 func init() {
-	createCriticalDirectory(directory.StaticFiles())
-	createCriticalDirectory(directory.UserUploads())
+	directory.CreateCriticalDirectories()
 }
 
-func createCriticalDirectory(dir string) {
-	err := os.Mkdir(dir, os.ModePerm)
-	switch {
-	case os.IsExist(err):
-		return
-	case err != nil:
-		log.Fatalln(err)
-	}
-}
-
-func initHandlers(r *mux.Router) {
+func initHandlers(ctx context.Context, r *mux.Router) {
 	// Pages
 	r.HandleFunc(directory.IndexHTTP, indexHandler).Methods(http.MethodGet)
 	r.HandleFunc(directory.RegisterHTTP, registerHandler).Methods(http.MethodGet)
@@ -59,12 +49,20 @@ func initHandlers(r *mux.Router) {
 	r.PathPrefix(directory.StaticHTTP).HandlerFunc(staticFileServerHandler).Methods(http.MethodGet)
 
 	// API
-	api.HandleApi(r)
+	api.HandleApi(ctx, r)
+}
+
+func defaultContextTimeout() (context.Context, context.CancelFunc) {
+	return context.WithTimeout(context.Background(), 15*time.Second)
 }
 
 func main() {
+	ctx, cancel := defaultContextTimeout()
+	defer cancel()
+	database.Connect(ctx)
+
 	r := mux.NewRouter()
-	initHandlers(r)
+	initHandlers(ctx, r)
 
 	srv := http.Server{
 		Addr:         "localhost:80",
@@ -72,7 +70,7 @@ func main() {
 		WriteTimeout: 15 * time.Second,
 		ReadTimeout:  15 * time.Second,
 	}
-	panic(srv.ListenAndServe())
+	log.Panicln(srv.ListenAndServe())
 }
 
 func getFileServerHandler(w http.ResponseWriter, r *http.Request, prefix, dir string) http.Handler {
@@ -92,10 +90,13 @@ func staticFileServerHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func uploadsFileServerHandler(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := defaultContextTimeout()
+	defer cancel()
+
 	defer catcherr.RecoverState(`main.uploadsFileServerHandler`)
 
 	var (
-		userID  = api.GetUserID(w, r)
+		userID  = api.GetUserID(ctx, w, r)
 		userDir = fmt.Sprint(directory.UploadsHTTP, userID, `/`)
 	)
 
@@ -110,25 +111,41 @@ func uploadsFileServerHandler(w http.ResponseWriter, r *http.Request) {
 
 func indexHandler(w http.ResponseWriter, r *http.Request) {
 	defer catcherr.RecoverState(`main.indexHandler`)
-	executeTemplate(w, directory.IndexPage())
+
+	ctx, cancel := defaultContextTimeout()
+	defer cancel()
+
+	executeTemplate(ctx, w, directory.IndexPage())
 }
 
 func profileHandler(w http.ResponseWriter, r *http.Request) {
 	defer catcherr.RecoverState(`main.profileHandler`)
-	executeTemplate(w, directory.ProfilePage())
+
+	ctx, cancel := defaultContextTimeout()
+	defer cancel()
+
+	executeTemplate(ctx, w, directory.ProfilePage())
 }
 
 func registerHandler(w http.ResponseWriter, r *http.Request) {
 	defer catcherr.RecoverState(`main.registerHandler`)
-	executeTemplate(w, directory.RegisterPage())
+
+	ctx, cancel := defaultContextTimeout()
+	defer cancel()
+
+	executeTemplate(ctx, w, directory.RegisterPage())
 }
 
 func loginHandler(w http.ResponseWriter, r *http.Request) {
 	defer catcherr.RecoverState(`main.loginHandler`)
-	executeTemplate(w, directory.LoginPage())
+
+	ctx, cancel := defaultContextTimeout()
+	defer cancel()
+
+	executeTemplate(ctx, w, directory.LoginPage())
 }
 
-func executeTemplate(w http.ResponseWriter, directory string) {
+func executeTemplate(ctx context.Context, w http.ResponseWriter, directory string) {
 	if directory == `` {
 		err := errors.New(`Template directory is empty`)
 		catcherr.HandleError(w, catcherr.InternalServerError, err)

@@ -46,7 +46,7 @@ func RecoverState(sender string) {
 
 func logError(sender string, data interface{}) {
 	const tmpl = `[ Sender: %s ]: %v `
-	log.Panicln(fmt.Errorf(tmpl, sender, data))
+	log.Printf(tmpl, sender, data)
 }
 
 func sendErrorData(w http.ResponseWriter, statusCode int, data interface{}) {
