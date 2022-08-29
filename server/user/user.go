@@ -51,19 +51,24 @@ func ComparePasswords(
 	catcherr.HandleErrorChannel(errChan, catcherr.Unathorized, err)
 }
 
-func SaveUploadedFile(w http.ResponseWriter, f FileStruct) {
-	path := filepath.Join(f.Directory, f.FileHeader.Filename)
+func SaveUploadedFiles(w http.ResponseWriter, files []FileStruct) {
+	for _, f := range files {
+		path := filepath.Join(f.Directory, f.FileHeader.Filename)
 
-	newFile, err := os.Create(path)
-	catcherr.HandleError(w, catcherr.InternalServerError, err)
-	defer newFile.Close()
+		newFile, err := os.Create(path)
+		catcherr.HandleError(w, catcherr.InternalServerError, err)
+		defer newFile.Close()
 
-	_, err = io.Copy(newFile, f.File)
-	catcherr.HandleError(w, catcherr.InternalServerError, err)
+		_, err = io.Copy(newFile, f.File)
+		catcherr.HandleError(w, catcherr.InternalServerError, err)
+	}
 }
 
 func GetFiles(w http.ResponseWriter, dir string) (files []string) {
 	dirEntry, err := os.ReadDir(dir)
+	if os.IsNotExist(err) {
+		err = os.Mkdir(dir, os.ModePerm)
+	}
 	catcherr.HandleError(w, catcherr.InternalServerError, err)
 
 	for _, f := range dirEntry {

@@ -39,17 +39,22 @@ const (
 	UserUploadsRoot = "userdata"
 )
 
-func IndexPage() string { return filepath.Join(StaticFilesRoot, "index.html") }
+func CleanPath(elem ...string) string {
+	path := filepath.Join(elem...)
+	return filepath.Clean(path)
+}
 
-func RegisterPage() string { return filepath.Join(StaticFilesRoot, "register.html") }
+func IndexPage() string { return CleanPath(StaticFilesRoot, "index.html") }
 
-func LoginPage() string { return filepath.Join(StaticFilesRoot, "login.html") }
+func RegisterPage() string { return CleanPath(StaticFilesRoot, "register.html") }
 
-func ProfilePage() string { return filepath.Join(StaticFilesRoot, "profile.html") }
+func LoginPage() string { return CleanPath(StaticFilesRoot, "login.html") }
 
-func StaticFiles() string { return filepath.Join(StaticFilesRoot, `static`) }
+func ProfilePage() string { return CleanPath(StaticFilesRoot, "profile.html") }
 
-func UserUploads() string { return filepath.Join(UserUploadsRoot, `uploads`) }
+func StaticFiles() string { return CleanPath(StaticFilesRoot, `static`) }
+
+func UserUploads() string { return CleanPath(UserUploadsRoot, `uploads`) }
 
 func CreateCriticalDirectories() {
 	directories := []string{

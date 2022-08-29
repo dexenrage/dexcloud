@@ -20,8 +20,8 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"mime/multipart"
 	"net/http"
-	"path/filepath"
 	"sync"
 	"time"
 
@@ -45,7 +45,9 @@ func defaultContextTimeout(ctx context.Context) (context.Context, context.Cancel
 	return context.WithTimeout(ctx, 15*time.Second)
 }
 
-func getUserDir(userID string) string { return filepath.Join(directory.UserUploads(), userID) }
+func getUserDir(userID string) string {
+	return directory.CleanPath(directory.UserUploads(), userID)
+}
 
 func fileListHandler(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := defaultContextTimeout(context.Background())
@@ -137,21 +139,42 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func uploadHandler(w http.ResponseWriter, r *http.Request) {
+	defer catcherr.RecoverState(`api.uploadHandler`)
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	defer catcherr.RecoverState(`api.uploadHandler`)
-	userID := GetUserID(ctx, w, r)
-
-	file, fileHeader, err := r.FormFile("file")
+	err := r.ParseMultipartForm(32 << 20)
 	catcherr.HandleError(w, catcherr.InternalServerError, err)
-	defer file.Close()
 
-	f := user.FileStruct{
-		Directory:  getUserDir(userID),
-		File:       file,
-		FileHeader: fileHeader,
+	var (
+		file        multipart.File
+		fileData    []user.FileStruct
+		fileList    = r.MultipartForm.File["file"]
+		destination = getUserDir(GetUserID(ctx, w, r))
+	)
+
+	for _, fileHeader := range fileList {
+		file, err = fileHeader.Open()
+
+		// Save successfully uploaded files if catch an error
+		if err != nil {
+			user.SaveUploadedFiles(w, fileData)
+			catcherr.HandleError(w, catcherr.InternalServerError, err)
+		}
+		defer file.Close()
+
+		fileData = append(
+			fileData,
+			user.FileStruct{
+				Directory:  destination,
+				File:       file,
+				FileHeader: fileHeader,
+			},
+		)
+
 	}
-	user.SaveUploadedFile(w, f)
+
+	user.SaveUploadedFiles(w, fileData)
 	response.Send(w, responseData{http.StatusOK, `OK`})
 }

@@ -18,11 +18,9 @@ package database
 
 import "github.com/uptrace/bun"
 
-type (
-	User struct {
-		bun.BaseModel `bun:"table:users,alias:u"`
-		ID            int64  `bun:"id,pk,autoincrement"`
-		Login         string `bun:"login,notnull" json:"login"`
-		Password      string `bun:"password,notnull" json:"password"`
-	}
-)
+type User struct {
+	bun.BaseModel `bun:"table:users,alias:u"`
+	ID            int64  `bun:"id,pk,autoincrement"`
+	Login         string `bun:"login,notnull" json:"login"`
+	Password      string `bun:"password,notnull" json:"password"`
+}
