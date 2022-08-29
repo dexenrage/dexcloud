@@ -19,11 +19,10 @@ package api
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"server/catcherr"
@@ -34,45 +33,42 @@ import (
 	"github.com/gorilla/mux"
 )
 
-func HandleApi(ctx context.Context, r *mux.Router) {
+func HandleApi(r *mux.Router) {
 	r.HandleFunc(directory.ApiCheckAuthHTTP, checkAuthHandler).Methods(http.MethodGet)
 	r.HandleFunc(directory.ApiRegisterHTTP, registerHandler).Methods(http.MethodPost)
 	r.HandleFunc(directory.ApiLoginHTTP, loginHandler).Methods(http.MethodPost)
-	r.HandleFunc(directory.ApiUploadHTTP, uploadHandler).Methods(http.MethodPost)
+	r.HandleFunc(directory.ApiUploadHTTP, uploadHandler).Methods(http.MethodPut)
 	r.HandleFunc(directory.ApiFileListHTTP, fileListHandler).Methods(http.MethodGet)
 }
 
-func defaultContextTimeout() (context.Context, context.CancelFunc) {
-	return context.WithTimeout(context.Background(), 5000*time.Second)
+func defaultContextTimeout(ctx context.Context) (context.Context, context.CancelFunc) {
+	return context.WithTimeout(ctx, 15*time.Second)
 }
 
 func getUserDir(userID string) string { return filepath.Join(directory.UserUploads(), userID) }
 
 func fileListHandler(w http.ResponseWriter, r *http.Request) {
-	ctx, cancel := defaultContextTimeout()
+	ctx, cancel := defaultContextTimeout(context.Background())
 	defer cancel()
 
 	var data fileListStruct
 	data.UserID = GetUserID(ctx, w, r)
-	data.Files = user.GetFiles(ctx, w, getUserDir(data.UserID))
+	data.Files = user.GetFiles(w, getUserDir(data.UserID))
 
-	response.Send(ctx, w, responseData{http.StatusOK, data})
+	response.Send(w, responseData{http.StatusOK, data})
 }
 
 func checkAuthHandler(w http.ResponseWriter, r *http.Request) {
-	ctx, cancel := defaultContextTimeout()
-	defer cancel()
-
 	defer catcherr.RecoverState(`api.checkAuthHandler`)
-	parseToken(ctx, w, r)
-	response.Send(ctx, w, responseData{http.StatusOK, `Authorized`})
+	parseToken(w, r)
+	response.Send(w, responseData{http.StatusOK, `Authorized`})
 }
 
 func registerHandler(w http.ResponseWriter, r *http.Request) {
-	ctx, cancel := defaultContextTimeout()
-	defer cancel()
-
 	defer catcherr.RecoverState(`api.registerHandler`)
+
+	ctx, cancel := defaultContextTimeout(context.Background())
+	defer cancel()
 
 	bodyBuffer, err := io.ReadAll(r.Body)
 	catcherr.HandleError(w, catcherr.InternalServerError, err)
@@ -81,23 +77,34 @@ func registerHandler(w http.ResponseWriter, r *http.Request) {
 	err = json.Unmarshal(bodyBuffer, &acc)
 	catcherr.HandleError(w, catcherr.InternalServerError, err)
 
-	acc.HashedPassword = user.GeneratePasswordHash(ctx, w, acc.HashedPassword)
-	acc = database.RegisterUser(ctx, w, acc)
+	var (
+		wg        = &sync.WaitGroup{}
+		tokenChan = make(chan tokenData, 1)
+		errChan   = make(chan catcherr.ErrorChan, 1)
+	)
+	defer close(tokenChan)
+	defer close(errChan)
 
-	userID := fmt.Sprint(acc.ID)
+	wg.Add(2)
+	go goRegisterUser(ctx, wg, acc, errChan)
+	go goGetTokenData(wg, acc.Login, tokenChan, errChan)
 
-	err = os.Mkdir(getUserDir(userID), os.ModePerm)
-	catcherr.HandleError(w, catcherr.InternalServerError, err)
-
-	data := createToken(ctx, w, acc.Login)
-	response.Send(ctx, w, responseData{http.StatusOK, data})
+	waitChan := waitGorutines(wg)
+	select {
+	case <-ctx.Done():
+		catcherr.HandleError(w, catcherr.InternalServerError, ctx.Err())
+	case <-errChan:
+		catcherr.HandleError(w, (<-errChan).CustomError, (<-errChan).Error)
+	case <-waitChan:
+		response.Send(w, responseData{http.StatusOK, <-tokenChan})
+	}
 }
 
 func loginHandler(w http.ResponseWriter, r *http.Request) {
-	ctx, cancel := defaultContextTimeout()
-	defer cancel()
-
 	defer catcherr.RecoverState(`api.loginHandler`)
+
+	ctx, cancel := defaultContextTimeout(context.Background())
+	defer cancel()
 
 	bodyBuffer, err := io.ReadAll(r.Body)
 	catcherr.HandleError(w, catcherr.InternalServerError, err)
@@ -106,10 +113,27 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 	err = json.Unmarshal(bodyBuffer, &acc)
 	catcherr.HandleError(w, catcherr.InternalServerError, err)
 
-	user.CompareLoginCredentials(ctx, w, acc.Login, acc.HashedPassword)
+	var (
+		wg        = &sync.WaitGroup{}
+		tokenChan = make(chan tokenData, 1)
+		errChan   = make(chan catcherr.ErrorChan)
+	)
+	defer close(tokenChan)
+	defer close(errChan)
 
-	data := createToken(ctx, w, acc.Login)
-	response.Send(ctx, w, responseData{http.StatusOK, data})
+	wg.Add(2)
+	go user.ComparePasswords(ctx, wg, acc.Login, acc.Password, errChan)
+	go goGetTokenData(wg, acc.Login, tokenChan, errChan)
+
+	wgDoneChan := waitGorutines(wg)
+	select {
+	case <-ctx.Done():
+		catcherr.HandleError(w, catcherr.InternalServerError, ctx.Err())
+	case data := <-errChan:
+		catcherr.HandleError(w, data.CustomError, data.Error)
+	case <-wgDoneChan:
+		response.Send(w, responseData{http.StatusOK, <-tokenChan})
+	}
 }
 
 func uploadHandler(w http.ResponseWriter, r *http.Request) {
@@ -128,6 +152,6 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 		File:       file,
 		FileHeader: fileHeader,
 	}
-	user.SaveUploadedFile(ctx, w, f)
-	response.Send(ctx, w, responseData{http.StatusOK, `OK`})
+	user.SaveUploadedFile(w, f)
+	response.Send(w, responseData{http.StatusOK, `OK`})
 }

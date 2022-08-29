@@ -1,4 +1,5 @@
 var authLinkParams = `href="/login"`;
+var authLinkIcon = `/static/img/login.svg`
 var authLinkWord = `Войти`;
 
 
@@ -14,6 +15,7 @@ function checkAuth() {
         xhrStatus = xhr.status
         if (xhrStatus == 200) {
             authLinkParams = ``;
+            authLinkIcon = `/static/img/logout.svg`;
             authLinkWord = `Выйти`;
             addHeader();
 
@@ -38,7 +40,7 @@ function addHeader() {
 
     var headerAuthLink = `
     <a class="header-auth-link" id="header-auth-link" ${authLinkParams}>
-        <img alt="${authLinkWord}" src="/static/img/account.svg">
+        <img alt="${authLinkWord}" src="${authLinkIcon}">
         <b>${authLinkWord}</b>
     </a>`;
 

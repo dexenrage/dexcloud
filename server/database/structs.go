@@ -20,9 +20,9 @@ import "github.com/uptrace/bun"
 
 type (
 	User struct {
-		bun.BaseModel  `bun:"table:users,alias:u"`
-		ID             int64  `bun:"id,pk,autoincrement"`
-		Login          string `bun:"login,notnull" json:"login"`
-		HashedPassword string `bun:"password,notnull" json:"password"`
+		bun.BaseModel `bun:"table:users,alias:u"`
+		ID            int64  `bun:"id,pk,autoincrement"`
+		Login         string `bun:"login,notnull" json:"login"`
+		Password      string `bun:"password,notnull" json:"password"`
 	}
 )

@@ -1,25 +1,48 @@
+const uploadForm = document.querySelector(".upload");
+const fileInput = document.querySelector(".file-input")
+
+uploadForm.addEventListener("click", () => {
+    fileInput.click();
+});
+
+fileInput.onchange = function () {
+    uploadFile();
+}
+
+function uploadFile() {
+    const xhr = new XMLHttpRequest();
+    xhr.open("put", "/api/upload");
+    xhr.responseType = `json`;
+    const data = new FormData();
+
+    var files = document.getElementById('file').files;
+    for (var i = 0; i < files.length; i++) {
+        data.append(files[i].name, files[i]);
+    }
+
+    xhr.send(data);
+}
+
+
+
 window.onload = function () {
     function getFileList() {
-        var xhr = new XMLHttpRequest();
+        const xhr = new XMLHttpRequest();
         xhr.open("get", "/api/filelist");
         xhr.setRequestHeader('Content-Type', 'application/json');
 
         xhr.responseType = `json`;
         xhr.onload = function () {
-            var status = xhr.status
-            if (status === 200) {
+            if (xhr.status === 200) {
                 const resp = xhr.response;
                 const data = resp.data
                 if (data.files?.length) {
                     Array.from(data.files).forEach(file => {
-                        var li = document.createElement("li");
+                        const li = document.createElement("li");
                         li.innerHTML = `<a download href="/uploads/${data.userid}/${file}">${file}</a>`;
                         list.appendChild(li);
                     });
                 }
-            } else {
-                alert(status.toString() + ` ` + xhr.statusText);
-                return;
             }
         };
         xhr.send();

@@ -30,8 +30,7 @@ import (
 
 var jwtKey = []byte(`QHhpZGlvCg==`) // UNSAFE
 
-func createToken(ctx context.Context, w http.ResponseWriter, login string) tokenStruct {
-	defer catcherr.RecoverState(`api.createToken`)
+func createToken(login string) (data tokenData, err error) {
 	expirationTime := jwt.NewNumericDate(time.Now().Add(15 * time.Minute))
 
 	claims := &jwtClaims{
@@ -43,18 +42,17 @@ func createToken(ctx context.Context, w http.ResponseWriter, login string) token
 	tkn := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 
 	token, err := tkn.SignedString(jwtKey)
-	catcherr.HandleError(w, catcherr.InternalServerError, err)
-
 	expires := expirationTime.UTC().Format(http.TimeFormat)
-	data := tokenStruct{
+
+	return tokenData{
 		Login:   login,
 		Token:   token,
 		Expires: expires,
-	}
-	return data
+	}, err
+
 }
 
-func getCookie(ctx context.Context, w http.ResponseWriter, r *http.Request, name string) (cookie string) {
+func getCookie(w http.ResponseWriter, r *http.Request, name string) (cookie string) {
 	c, err := r.Cookie(name)
 	if errors.Is(err, http.ErrNoCookie) {
 		catcherr.HandleError(w, catcherr.Unathorized, err)
@@ -63,8 +61,8 @@ func getCookie(ctx context.Context, w http.ResponseWriter, r *http.Request, name
 	return c.Value
 }
 
-func parseToken(ctx context.Context, w http.ResponseWriter, r *http.Request) {
-	tokenCookie := getCookie(ctx, w, r, `token`)
+func parseToken(w http.ResponseWriter, r *http.Request) {
+	tokenCookie := getCookie(w, r, `token`)
 	var (
 		claims  = &jwtClaims{}
 		keyfunc = func(tkn *jwt.Token) (interface{}, error) { return jwtKey, nil }
@@ -76,7 +74,7 @@ func parseToken(ctx context.Context, w http.ResponseWriter, r *http.Request) {
 	}
 	catcherr.HandleError(w, catcherr.BadRequest, err)
 
-	if claims.Login != getCookie(ctx, w, r, `login`) {
+	if claims.Login != getCookie(w, r, `login`) {
 		err := errors.New(`Invalid login`)
 		catcherr.HandleError(w, catcherr.Unathorized, err)
 	}
@@ -89,11 +87,12 @@ func parseToken(ctx context.Context, w http.ResponseWriter, r *http.Request) {
 
 func GetUserID(ctx context.Context, w http.ResponseWriter, r *http.Request) (userID string) {
 	defer catcherr.RecoverState(`api.GetUserID`)
-	parseToken(ctx, w, r)
+	parseToken(w, r)
 
 	var (
-		login = getCookie(ctx, w, r, `login`)
-		id    = database.GetUserInfo(ctx, w, login).ID // int64
+		login     = getCookie(w, r, `login`)
+		user, err = database.GetUserInfo(ctx, login) // int64
 	)
-	return fmt.Sprint(id)
+	catcherr.HandleError(w, catcherr.InternalServerError, err)
+	return fmt.Sprint(user.ID)
 }

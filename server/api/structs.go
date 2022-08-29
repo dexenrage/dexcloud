@@ -16,7 +16,9 @@ limitations under the License.
 
 package api
 
-import "github.com/golang-jwt/jwt/v4"
+import (
+	"github.com/golang-jwt/jwt/v4"
+)
 
 type (
 	fileListStruct struct {
@@ -29,7 +31,7 @@ type (
 		Login string `json:"login"`
 	}
 
-	tokenStruct struct {
+	tokenData struct {
 		Login   string `json:"login"`
 		Token   string `json:"token"`
 		Expires string `json:"expires"`

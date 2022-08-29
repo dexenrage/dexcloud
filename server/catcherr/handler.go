@@ -33,8 +33,14 @@ func init() {
 
 func HandleError(w http.ResponseWriter, c CustomError, err error) {
 	if err != nil {
-		sendErrorData(w, c.StatusCode, c.Description)
+		sendErrorData(w, response{c.StatusCode, c.Description})
 		panic(err)
+	}
+}
+
+func HandleErrorChannel(errChan chan<- ErrorChan, c CustomError, err error) {
+	if err != nil {
+		errChan <- ErrorChan{c, err}
 	}
 }
 
@@ -49,16 +55,12 @@ func logError(sender string, data interface{}) {
 	log.Printf(tmpl, sender, data)
 }
 
-func sendErrorData(w http.ResponseWriter, statusCode int, data interface{}) {
-	var resp response
-	resp.StatusCode = statusCode
-	resp.Data = data
-
+func sendErrorData(w http.ResponseWriter, resp response) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(resp.StatusCode)
 
 	err := json.NewEncoder(w).Encode(resp)
 	if err != nil {
-		logError(`ResponseWriter`, fmt.Sprint(`Can't send data to user. Reason: `, err))
+		logError(`catcherr.sendErrorData`, fmt.Sprint(`Can't send data to user. Reason: `, err))
 	}
 }

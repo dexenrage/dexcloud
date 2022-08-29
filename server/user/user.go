@@ -24,33 +24,34 @@ import (
 	"path/filepath"
 	"server/catcherr"
 	"server/database"
+	"sync"
 
 	"golang.org/x/crypto/bcrypt"
 )
 
-func GeneratePasswordHash(ctx context.Context, w http.ResponseWriter, password string) (hash string) {
-	defer catcherr.RecoverState(`user.GeneratePasswordHash`)
-
+func GeneratePasswordHash(password string) (hash string, err error) {
 	hashBytes, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
-	catcherr.HandleError(w, catcherr.InternalServerError, err)
-
-	return string(hashBytes)
+	return string(hashBytes), err
 }
 
-func CompareLoginCredentials(ctx context.Context, w http.ResponseWriter, login, password string) {
-	defer catcherr.RecoverState(`user.CompareLoginData`)
-	hash := database.GetUserInfo(ctx, w, login).HashedPassword
+func ComparePasswords(
+	ctx context.Context,
+	wg *sync.WaitGroup,
+	login, password string,
+	errChan chan<- catcherr.ErrorChan,
+) {
+	defer wg.Done()
+	user, err := database.GetUserInfo(ctx, login)
+	catcherr.HandleErrorChannel(errChan, catcherr.InternalServerError, err)
 
-	hashBytes := []byte(hash)
+	hashBytes := []byte(user.Password)
 	passwordBytes := []byte(password)
 
-	err := bcrypt.CompareHashAndPassword(hashBytes, passwordBytes)
-	catcherr.HandleError(w, catcherr.Unathorized, err)
+	err = bcrypt.CompareHashAndPassword(hashBytes, passwordBytes)
+	catcherr.HandleErrorChannel(errChan, catcherr.Unathorized, err)
 }
 
-func SaveUploadedFile(ctx context.Context, w http.ResponseWriter, f FileStruct) {
-	defer catcherr.RecoverState(`user.SaveUploadedFile`)
-
+func SaveUploadedFile(w http.ResponseWriter, f FileStruct) {
 	path := filepath.Join(f.Directory, f.FileHeader.Filename)
 
 	newFile, err := os.Create(path)
@@ -61,9 +62,7 @@ func SaveUploadedFile(ctx context.Context, w http.ResponseWriter, f FileStruct) 
 	catcherr.HandleError(w, catcherr.InternalServerError, err)
 }
 
-func GetFiles(ctx context.Context, w http.ResponseWriter, dir string) (files []string) {
-	defer catcherr.RecoverState(`user.GetFiles`)
-
+func GetFiles(w http.ResponseWriter, dir string) (files []string) {
 	dirEntry, err := os.ReadDir(dir)
 	catcherr.HandleError(w, catcherr.InternalServerError, err)
 

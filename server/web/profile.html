@@ -8,15 +8,18 @@
 </head>
 
 <body>
-    <form class="upload" action="/api/upload" method="post" enctype="multipart/form-data">
-        <input type="file" name="file">
-        <input type="submit" formenctype="multipart/form-data" value="Upload">
+    <script src="/static/js/header.js"></script>
+    <form class="upload" action="#" method="post" enctype="multipart/form-data">
+        <button type="button" class="file-input" formenctype="multipart/form-data">
+            <label for="file"><img src="/static/img/upload.svg" alt="Загрузить в облако"></label>
+            <input type="file" style="display: none" name="file" id="file" formenctype="multipart/form-data" multiple>
+        </button>
     </form>
-    <form class="files" method="get">
+    <form class=" files" method="get">
         <script src="/static/js/profile.js"></script>
         <ul id="list"></ul>
     </form>
-    <script src="/static/js/header.js"></script>
+
 </body>
 
 </html>

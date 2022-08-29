@@ -20,8 +20,6 @@ import (
 	"context"
 	"database/sql"
 	"log"
-	"net/http"
-	"server/catcherr"
 
 	"github.com/uptrace/bun"
 	"github.com/uptrace/bun/dialect/pgdialect"
@@ -31,7 +29,9 @@ import (
 
 var db *bun.DB
 
-func Connect(ctx context.Context) {
+func init() {
+	ctx := context.Background()
+
 	// Open a PostgreSQL database.
 	dsn := "postgres://postgres:123456@localhost:5432/users?sslmode=disable"
 	pgdb := sql.OpenDB(pgdriver.NewConnector(pgdriver.WithDSN(dsn)))
@@ -48,18 +48,16 @@ func Connect(ctx context.Context) {
 	}
 }
 
-func RegisterUser(ctx context.Context, w http.ResponseWriter, user User) User {
-	_, err := db.NewInsert().Model(&user).Exec(ctx)
-	catcherr.HandleError(w, catcherr.InternalServerError, err)
-
-	return GetUserInfo(ctx, w, user.Login)
+func RegisterUser(ctx context.Context, u User) (user User, err error) {
+	_, err = db.NewInsert().Model(&u).Exec(ctx)
+	if err != nil {
+		return user, err
+	}
+	return GetUserInfo(ctx, u.Login)
 }
 
-func GetUserInfo(ctx context.Context, w http.ResponseWriter, login string) User {
+func GetUserInfo(ctx context.Context, login string) (user User, err error) {
 	u := new(User)
-
-	err := db.NewSelect().Model(u).Where(`login = ?`, login).Scan(ctx)
-	catcherr.HandleError(w, catcherr.InternalServerError, err)
-
-	return *u
+	err = db.NewSelect().Model(u).Where(`login = ?`, login).Scan(ctx)
+	return *u, err
 }

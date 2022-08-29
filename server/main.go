@@ -25,7 +25,6 @@ import (
 	"net/http"
 	"server/api"
 	"server/catcherr"
-	"server/database"
 	"server/directory"
 	"strings"
 	"time"
@@ -37,7 +36,7 @@ func init() {
 	directory.CreateCriticalDirectories()
 }
 
-func initHandlers(ctx context.Context, r *mux.Router) {
+func initHandlers(r *mux.Router) {
 	// Pages
 	r.HandleFunc(directory.IndexHTTP, indexHandler).Methods(http.MethodGet)
 	r.HandleFunc(directory.RegisterHTTP, registerHandler).Methods(http.MethodGet)
@@ -49,20 +48,12 @@ func initHandlers(ctx context.Context, r *mux.Router) {
 	r.PathPrefix(directory.StaticHTTP).HandlerFunc(staticFileServerHandler).Methods(http.MethodGet)
 
 	// API
-	api.HandleApi(ctx, r)
-}
-
-func defaultContextTimeout() (context.Context, context.CancelFunc) {
-	return context.WithTimeout(context.Background(), 15*time.Second)
+	api.HandleApi(r)
 }
 
 func main() {
-	ctx, cancel := defaultContextTimeout()
-	defer cancel()
-	database.Connect(ctx)
-
 	r := mux.NewRouter()
-	initHandlers(ctx, r)
+	initHandlers(r)
 
 	srv := http.Server{
 		Addr:         "localhost:80",
@@ -90,7 +81,7 @@ func staticFileServerHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func uploadsFileServerHandler(w http.ResponseWriter, r *http.Request) {
-	ctx, cancel := defaultContextTimeout()
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
 	defer catcherr.RecoverState(`main.uploadsFileServerHandler`)
@@ -111,41 +102,25 @@ func uploadsFileServerHandler(w http.ResponseWriter, r *http.Request) {
 
 func indexHandler(w http.ResponseWriter, r *http.Request) {
 	defer catcherr.RecoverState(`main.indexHandler`)
-
-	ctx, cancel := defaultContextTimeout()
-	defer cancel()
-
-	executeTemplate(ctx, w, directory.IndexPage())
+	executeTemplate(w, directory.IndexPage())
 }
 
 func profileHandler(w http.ResponseWriter, r *http.Request) {
 	defer catcherr.RecoverState(`main.profileHandler`)
-
-	ctx, cancel := defaultContextTimeout()
-	defer cancel()
-
-	executeTemplate(ctx, w, directory.ProfilePage())
+	executeTemplate(w, directory.ProfilePage())
 }
 
 func registerHandler(w http.ResponseWriter, r *http.Request) {
 	defer catcherr.RecoverState(`main.registerHandler`)
-
-	ctx, cancel := defaultContextTimeout()
-	defer cancel()
-
-	executeTemplate(ctx, w, directory.RegisterPage())
+	executeTemplate(w, directory.RegisterPage())
 }
 
 func loginHandler(w http.ResponseWriter, r *http.Request) {
 	defer catcherr.RecoverState(`main.loginHandler`)
-
-	ctx, cancel := defaultContextTimeout()
-	defer cancel()
-
-	executeTemplate(ctx, w, directory.LoginPage())
+	executeTemplate(w, directory.LoginPage())
 }
 
-func executeTemplate(ctx context.Context, w http.ResponseWriter, directory string) {
+func executeTemplate(w http.ResponseWriter, directory string) {
 	if directory == `` {
 		err := errors.New(`Template directory is empty`)
 		catcherr.HandleError(w, catcherr.InternalServerError, err)
