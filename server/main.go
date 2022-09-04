@@ -17,11 +17,9 @@ limitations under the License.
 package main
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"html/template"
-	"log"
 	"net/http"
 	"server/api"
 	"server/catcherr"
@@ -33,7 +31,8 @@ import (
 )
 
 func init() {
-	directory.CreateCriticalDirectories()
+	err := directory.CreateCriticalDirectories()
+	catcherr.HandleError(err)
 }
 
 func initHandlers(r *mux.Router) {
@@ -52,6 +51,8 @@ func initHandlers(r *mux.Router) {
 }
 
 func main() {
+	defer catcherr.Recover(`main.main()`)
+
 	r := mux.NewRouter()
 	initHandlers(r)
 
@@ -61,13 +62,13 @@ func main() {
 		WriteTimeout: 15 * time.Second,
 		ReadTimeout:  15 * time.Second,
 	}
-	log.Panicln(srv.ListenAndServe())
+	catcherr.HandleError(srv.ListenAndServe())
 }
 
 func getFileServerHandler(w http.ResponseWriter, r *http.Request, prefix, dir string) http.Handler {
 	if strings.HasSuffix(r.URL.Path, "/") {
-		err := errors.New(`The user is not allowed to enter this directory`)
-		catcherr.HandleError(w, catcherr.Forbidden, err)
+		err := errors.New(catcherr.Forbidden.Description)
+		catcherr.HandleAndResponse(w, catcherr.Forbidden, err)
 	}
 
 	fs := http.FileServer(http.Dir(dir))
@@ -75,25 +76,23 @@ func getFileServerHandler(w http.ResponseWriter, r *http.Request, prefix, dir st
 }
 
 func staticFileServerHandler(w http.ResponseWriter, r *http.Request) {
-	defer catcherr.RecoverState(`main.staticFileServerHandler`)
+	defer catcherr.Recover(`main.staticFileServerHandler`)
 	handler := getFileServerHandler(w, r, directory.StaticHTTP, directory.StaticFiles())
 	handler.ServeHTTP(w, r)
 }
 
 func uploadsFileServerHandler(w http.ResponseWriter, r *http.Request) {
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-	defer cancel()
+	defer catcherr.Recover(`main.uploadsFileServerHandler()`)
+	ctx := r.Context()
 
-	defer catcherr.RecoverState(`main.uploadsFileServerHandler`)
+	uid, err := api.GetUserID(ctx, r)
+	catcherr.HandleAndResponse(w, catcherr.Unathorized, err)
 
-	var (
-		userID  = api.GetUserID(ctx, w, r)
-		userDir = fmt.Sprint(directory.UploadsHTTP, userID, `/`)
-	)
+	dir := fmt.Sprint(directory.UploadsHTTP, uid, directory.Slash)
 
-	if !strings.HasPrefix(r.URL.Path, userDir) {
-		err := errors.New(`The user is not allowed to enter this directory`)
-		catcherr.HandleError(w, catcherr.Forbidden, err)
+	if !strings.HasPrefix(r.URL.Path, dir) {
+		err := errors.New(catcherr.Forbidden.Description)
+		catcherr.HandleAndResponse(w, catcherr.Forbidden, err)
 	}
 
 	handler := getFileServerHandler(w, r, directory.UploadsHTTP, directory.UserUploads())
@@ -101,34 +100,34 @@ func uploadsFileServerHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func indexHandler(w http.ResponseWriter, r *http.Request) {
-	defer catcherr.RecoverState(`main.indexHandler`)
+	defer catcherr.Recover(`main.indexHandler`)
 	executeTemplate(w, directory.IndexPage())
 }
 
 func profileHandler(w http.ResponseWriter, r *http.Request) {
-	defer catcherr.RecoverState(`main.profileHandler`)
+	defer catcherr.Recover(`main.profileHandler`)
 	executeTemplate(w, directory.ProfilePage())
 }
 
 func registerHandler(w http.ResponseWriter, r *http.Request) {
-	defer catcherr.RecoverState(`main.registerHandler`)
+	defer catcherr.Recover(`main.registerHandler`)
 	executeTemplate(w, directory.RegisterPage())
 }
 
 func loginHandler(w http.ResponseWriter, r *http.Request) {
-	defer catcherr.RecoverState(`main.loginHandler`)
+	defer catcherr.Recover(`main.loginHandler`)
 	executeTemplate(w, directory.LoginPage())
 }
 
 func executeTemplate(w http.ResponseWriter, directory string) {
 	if directory == `` {
 		err := errors.New(`Template directory is empty`)
-		catcherr.HandleError(w, catcherr.InternalServerError, err)
+		catcherr.HandleAndResponse(w, catcherr.InternalServerError, err)
 	}
 
 	tmpl, err := template.ParseFiles(directory)
-	catcherr.HandleError(w, catcherr.InternalServerError, err)
+	catcherr.HandleAndResponse(w, catcherr.InternalServerError, err)
 
 	err = tmpl.Execute(w, nil)
-	catcherr.HandleError(w, catcherr.InternalServerError, err)
+	catcherr.HandleAndResponse(w, catcherr.InternalServerError, err)
 }

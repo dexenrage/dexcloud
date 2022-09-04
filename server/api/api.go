@@ -17,13 +17,10 @@ limitations under the License.
 package api
 
 import (
-	"context"
 	"encoding/json"
 	"io"
 	"mime/multipart"
 	"net/http"
-	"sync"
-	"time"
 
 	"server/catcherr"
 	"server/database"
@@ -41,117 +38,101 @@ func HandleApi(r *mux.Router) {
 	r.HandleFunc(directory.ApiFileListHTTP, fileListHandler).Methods(http.MethodGet)
 }
 
-func defaultContextTimeout(ctx context.Context) (context.Context, context.CancelFunc) {
-	return context.WithTimeout(ctx, 15*time.Second)
-}
-
 func getUserDir(userID string) string {
 	return directory.CleanPath(directory.UserUploads(), userID)
 }
 
 func fileListHandler(w http.ResponseWriter, r *http.Request) {
-	ctx, cancel := defaultContextTimeout(context.Background())
-	defer cancel()
+	ctx := r.Context()
 
-	var data fileListStruct
-	data.UserID = GetUserID(ctx, w, r)
-	data.Files = user.GetFiles(w, getUserDir(data.UserID))
+	uid, err := GetUserID(ctx, r)
+	catcherr.HandleAndResponse(w, catcherr.Unathorized, err)
 
-	response.Send(w, responseData{http.StatusOK, data})
+	dir := getUserDir(uid)
+
+	files, err := user.GetFiles(dir)
+	catcherr.HandleAndResponse(w, catcherr.InternalServerError, err)
+
+	data := fileListStruct{
+		UserID: uid,
+		Files:  files,
+	}
+
+	err = response.Send(w, responseData{http.StatusOK, data})
+	catcherr.HandleError(err)
 }
 
 func checkAuthHandler(w http.ResponseWriter, r *http.Request) {
-	defer catcherr.RecoverState(`api.checkAuthHandler`)
-	parseToken(w, r)
-	response.Send(w, responseData{http.StatusOK, `Authorized`})
+	defer catcherr.Recover(`api.checkAuthHandler()`)
+
+	err := checkAuth(r)
+	catcherr.HandleAndResponse(w, catcherr.Unathorized, err)
+
+	err = response.Send(w, responseData{http.StatusOK, http.StatusText(http.StatusOK)})
+	catcherr.HandleError(err)
 }
 
 func registerHandler(w http.ResponseWriter, r *http.Request) {
-	defer catcherr.RecoverState(`api.registerHandler`)
-
-	ctx, cancel := defaultContextTimeout(context.Background())
-	defer cancel()
+	defer catcherr.Recover(`api.registerHandler()`)
+	ctx := r.Context()
 
 	bodyBuffer, err := io.ReadAll(r.Body)
-	catcherr.HandleError(w, catcherr.InternalServerError, err)
+	catcherr.HandleAndResponse(w, catcherr.InternalServerError, err)
 
 	var acc database.User
 	err = json.Unmarshal(bodyBuffer, &acc)
-	catcherr.HandleError(w, catcherr.InternalServerError, err)
+	catcherr.HandleAndResponse(w, catcherr.InternalServerError, err)
 
-	var (
-		wg        = &sync.WaitGroup{}
-		tokenChan = make(chan tokenData, 1)
-		errChan   = make(chan catcherr.ErrorChan, 1)
-	)
-	defer close(tokenChan)
-	defer close(errChan)
+	err = registerUser(ctx, acc)
+	catcherr.HandleAndResponse(w, catcherr.InternalServerError, err)
 
-	wg.Add(2)
-	go goRegisterUser(ctx, wg, acc, errChan)
-	go goGetTokenData(wg, acc.Login, tokenChan, errChan)
+	data, err := createToken(acc.Login)
+	catcherr.HandleAndResponse(w, catcherr.Unathorized, err)
 
-	waitChan := waitGorutines(wg)
-	select {
-	case <-ctx.Done():
-		catcherr.HandleError(w, catcherr.InternalServerError, ctx.Err())
-	case <-errChan:
-		catcherr.HandleError(w, (<-errChan).CustomError, (<-errChan).Error)
-	case <-waitChan:
-		response.Send(w, responseData{http.StatusOK, <-tokenChan})
-	}
+	err = response.Send(w, responseData{http.StatusOK, data})
+	catcherr.HandleError(err)
 }
 
 func loginHandler(w http.ResponseWriter, r *http.Request) {
-	defer catcherr.RecoverState(`api.loginHandler`)
-
-	ctx, cancel := defaultContextTimeout(context.Background())
-	defer cancel()
+	defer catcherr.Recover(`api.loginHandler()`)
+	ctx := r.Context()
 
 	bodyBuffer, err := io.ReadAll(r.Body)
-	catcherr.HandleError(w, catcherr.InternalServerError, err)
+	catcherr.HandleAndResponse(w, catcherr.InternalServerError, err)
 
 	var acc database.User
 	err = json.Unmarshal(bodyBuffer, &acc)
-	catcherr.HandleError(w, catcherr.InternalServerError, err)
+	catcherr.HandleAndResponse(w, catcherr.InternalServerError, err)
 
-	var (
-		wg        = &sync.WaitGroup{}
-		tokenChan = make(chan tokenData, 1)
-		errChan   = make(chan catcherr.ErrorChan)
-	)
-	defer close(tokenChan)
-	defer close(errChan)
+	userInfo, err := database.GetUserInfo(ctx, acc.Login)
+	catcherr.HandleAndResponse(w, catcherr.InternalServerError, err)
 
-	wg.Add(2)
-	go user.ComparePasswords(ctx, wg, acc.Login, acc.Password, errChan)
-	go goGetTokenData(wg, acc.Login, tokenChan, errChan)
+	err = user.ComparsePasswords(ctx, acc.Password, userInfo.Password)
+	catcherr.HandleAndResponse(w, catcherr.Unathorized, err)
 
-	wgDoneChan := waitGorutines(wg)
-	select {
-	case <-ctx.Done():
-		catcherr.HandleError(w, catcherr.InternalServerError, ctx.Err())
-	case data := <-errChan:
-		catcherr.HandleError(w, data.CustomError, data.Error)
-	case <-wgDoneChan:
-		response.Send(w, responseData{http.StatusOK, <-tokenChan})
-	}
+	data, err := createToken(acc.Login)
+	catcherr.HandleAndResponse(w, catcherr.Unathorized, err)
+
+	err = response.Send(w, responseData{http.StatusOK, data})
+	catcherr.HandleAndResponse(w, catcherr.InternalServerError, err)
 }
 
 func uploadHandler(w http.ResponseWriter, r *http.Request) {
-	defer catcherr.RecoverState(`api.uploadHandler`)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	defer catcherr.Recover(`api.uploadHandler()`)
+	ctx := r.Context()
 
 	err := r.ParseMultipartForm(32 << 20)
-	catcherr.HandleError(w, catcherr.InternalServerError, err)
+	catcherr.HandleAndResponse(w, catcherr.InternalServerError, err)
+
+	uid, err := GetUserID(ctx, r)
+	catcherr.HandleAndResponse(w, catcherr.Unathorized, err)
+
+	destination := getUserDir(uid)
 
 	var (
-		file        multipart.File
-		fileData    []user.FileStruct
-		fileList    = r.MultipartForm.File["file"]
-		destination = getUserDir(GetUserID(ctx, w, r))
+		file     multipart.File
+		fileData []user.FileStruct
+		fileList = r.MultipartForm.File["file"]
 	)
 
 	for _, fileHeader := range fileList {
@@ -159,8 +140,9 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 
 		// Save successfully uploaded files if catch an error
 		if err != nil {
-			user.SaveUploadedFiles(w, fileData)
-			catcherr.HandleError(w, catcherr.InternalServerError, err)
+			saveErr := user.SaveUploadedFiles(fileData)
+			catcherr.HandleAndResponse(w, catcherr.InternalServerError, saveErr)
+			catcherr.HandleAndResponse(w, catcherr.InternalServerError, err)
 		}
 		defer file.Close()
 
@@ -174,7 +156,9 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 		)
 
 	}
+	err = user.SaveUploadedFiles(fileData)
+	catcherr.HandleAndResponse(w, catcherr.InternalServerError, err)
 
-	user.SaveUploadedFiles(w, fileData)
-	response.Send(w, responseData{http.StatusOK, `OK`})
+	err = response.Send(w, responseData{http.StatusOK, http.StatusText(http.StatusOK)})
+	catcherr.HandleError(err)
 }

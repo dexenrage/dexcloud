@@ -29,14 +29,16 @@ const (
 
 var response responseData
 
-func (*responseData) Send(w http.ResponseWriter, resp responseData) {
-	defer catcherr.RecoverState(`api.response.Send`)
+func (*responseData) Send(w http.ResponseWriter, resp responseData) (err error) {
+	defer func() { err = catcherr.RecoverAndReturnError() }()
+
 	w.Header().Set(defaultResponseType, defaultResponseValue)
 	w.WriteHeader(resp.StatusCode)
 
 	jsonData, err := json.Marshal(resp)
-	catcherr.HandleError(w, catcherr.InternalServerError, err)
+	catcherr.HandleError(err)
 
 	_, err = w.Write(jsonData)
-	catcherr.HandleError(w, catcherr.InternalServerError, err)
+	catcherr.HandleError(err)
+	return err
 }

@@ -19,7 +19,7 @@ package database
 import (
 	"context"
 	"database/sql"
-	"log"
+	"server/catcherr"
 
 	"github.com/uptrace/bun"
 	"github.com/uptrace/bun/dialect/pgdialect"
@@ -43,16 +43,15 @@ func init() {
 	db.AddQueryHook(bundebug.NewQueryHook(bundebug.WithVerbose(true)))
 
 	_, err := db.NewCreateTable().Model((*User)(nil)).IfNotExists().Exec(ctx)
-	if err != nil {
-		log.Panicln(err)
-	}
+	catcherr.HandleError(err)
 }
 
 func RegisterUser(ctx context.Context, u User) (user User, err error) {
+	defer func() { err = catcherr.RecoverAndReturnError() }()
+
 	_, err = db.NewInsert().Model(&u).Exec(ctx)
-	if err != nil {
-		return user, err
-	}
+	catcherr.HandleError(err)
+
 	return GetUserInfo(ctx, u.Login)
 }
 

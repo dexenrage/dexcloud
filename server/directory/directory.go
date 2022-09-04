@@ -17,8 +17,11 @@ limitations under the License.
 package directory
 
 import (
+	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
+	"server/catcherr"
 )
 
 const (
@@ -56,8 +59,10 @@ func StaticFiles() string { return CleanPath(StaticFilesRoot, `static`) }
 
 func UserUploads() string { return CleanPath(UserUploadsRoot, `uploads`) }
 
-func CreateCriticalDirectories() {
-	directories := []string{
+func CreateCriticalDirectories() (err error) {
+	defer func() { err = catcherr.RecoverAndReturnError() }()
+
+	directories := [4]string{
 		StaticFilesRoot,
 		StaticFiles(),
 		UserUploadsRoot,
@@ -66,10 +71,10 @@ func CreateCriticalDirectories() {
 
 	for _, v := range directories {
 		err := os.Mkdir(v, os.ModePerm)
-		switch {
-		case os.IsExist(err):
-		case err != nil:
-			panic(err)
+		if errors.Is(err, fs.ErrExist) {
+			continue
 		}
+		catcherr.HandleError(err)
 	}
+	return err
 }

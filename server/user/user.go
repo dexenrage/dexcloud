@@ -18,61 +18,51 @@ package user
 
 import (
 	"context"
+	"errors"
 	"io"
-	"net/http"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"server/catcherr"
-	"server/database"
-	"sync"
 
 	"golang.org/x/crypto/bcrypt"
 )
 
 func GeneratePasswordHash(password string) (hash string, err error) {
-	hashBytes, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
-	return string(hashBytes), err
+	b, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	return string(b), err
 }
 
-func ComparePasswords(
-	ctx context.Context,
-	wg *sync.WaitGroup,
-	login, password string,
-	errChan chan<- catcherr.ErrorChan,
-) {
-	defer wg.Done()
-	user, err := database.GetUserInfo(ctx, login)
-	catcherr.HandleErrorChannel(errChan, catcherr.InternalServerError, err)
-
-	hashBytes := []byte(user.Password)
-	passwordBytes := []byte(password)
-
-	err = bcrypt.CompareHashAndPassword(hashBytes, passwordBytes)
-	catcherr.HandleErrorChannel(errChan, catcherr.Unathorized, err)
+func ComparsePasswords(ctx context.Context, password, hash string) error {
+	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
 }
 
-func SaveUploadedFiles(w http.ResponseWriter, files []FileStruct) {
+func SaveUploadedFiles(files []FileStruct) (err error) {
+	defer func() { err = catcherr.RecoverAndReturnError() }()
 	for _, f := range files {
 		path := filepath.Join(f.Directory, f.FileHeader.Filename)
 
 		newFile, err := os.Create(path)
-		catcherr.HandleError(w, catcherr.InternalServerError, err)
+		catcherr.HandleError(err)
 		defer newFile.Close()
 
 		_, err = io.Copy(newFile, f.File)
-		catcherr.HandleError(w, catcherr.InternalServerError, err)
+		catcherr.HandleError(err)
 	}
+	return err
 }
 
-func GetFiles(w http.ResponseWriter, dir string) (files []string) {
-	dirEntry, err := os.ReadDir(dir)
-	if os.IsNotExist(err) {
+func GetFiles(dir string) (files []string, err error) {
+	defer func() { err = catcherr.RecoverAndReturnError() }()
+
+	entry, err := os.ReadDir(dir)
+	if errors.Is(err, fs.ErrNotExist) {
 		err = os.Mkdir(dir, os.ModePerm)
 	}
-	catcherr.HandleError(w, catcherr.InternalServerError, err)
+	catcherr.HandleError(err)
 
-	for _, f := range dirEntry {
+	for _, f := range entry {
 		files = append(files, f.Name())
 	}
-	return files
+	return files, err
 }

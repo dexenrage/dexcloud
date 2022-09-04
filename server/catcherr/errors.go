@@ -28,25 +28,25 @@ var (
 
 func (e *CustomError) BadRequest() {
 	e.StatusCode = http.StatusBadRequest
-	e.Description = `Bad Request`
+	e.Description = http.StatusText(http.StatusBadRequest)
 }
 
 func (e *CustomError) Unathorized() {
 	e.StatusCode = http.StatusUnauthorized
-	e.Description = `Unathorized`
+	e.Description = http.StatusText(http.StatusUnauthorized)
 }
 
 func (e *CustomError) Forbidden() {
 	e.StatusCode = http.StatusForbidden
-	e.Description = `Forbidden`
+	e.Description = http.StatusText(http.StatusForbidden)
 }
 
 func (e *CustomError) NotFound() {
 	e.StatusCode = http.StatusNotFound
-	e.Description = `Not Found`
+	e.Description = http.StatusText(http.StatusNotFound)
 }
 
 func (e *CustomError) InternalServerError() {
 	e.StatusCode = http.StatusInternalServerError
-	e.Description = `Internal Server Error`
+	e.Description = http.StatusText(http.StatusInternalServerError)
 }

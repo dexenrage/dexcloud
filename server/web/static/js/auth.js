@@ -8,7 +8,6 @@ function handleAuth(event) {
 
   var xhr = new XMLHttpRequest();
   xhr.open("post", authApiPath);
-  console.log(value);
   xhr.setRequestHeader('Content-Type', 'application/json');
 
   xhr.responseType = `json`;
@@ -17,7 +16,6 @@ function handleAuth(event) {
     if (status === 200) {
       const resp = xhr.response;
       const data = resp.data;
-      console.log(data);
       document.cookie = `login=${data.login}; SameSite=None; Secure`;
       document.cookie = `token=${data.token}; expires=${data.expires}; SameSite=None; Secure`;
       window.location.replace("/profile");

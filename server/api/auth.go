@@ -18,11 +18,12 @@ package api
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/http"
+	"os"
 	"server/catcherr"
 	"server/database"
+	"server/user"
 	"time"
 
 	"github.com/golang-jwt/jwt/v4"
@@ -52,47 +53,71 @@ func createToken(login string) (data tokenData, err error) {
 
 }
 
-func getCookie(w http.ResponseWriter, r *http.Request, name string) (cookie string) {
+func getCookie(r *http.Request, name string) (value string, err error) {
 	c, err := r.Cookie(name)
-	if errors.Is(err, http.ErrNoCookie) {
-		catcherr.HandleError(w, catcherr.Unathorized, err)
-	}
-	catcherr.HandleError(w, catcherr.BadRequest, err)
-	return c.Value
+	return c.Value, err
 }
 
-func parseToken(w http.ResponseWriter, r *http.Request) {
-	tokenCookie := getCookie(w, r, `token`)
+func parseToken(r *http.Request, loginCookie string) (err error) {
+	defer func() { err = catcherr.RecoverAndReturnError() }()
+
+	tokenCookie, err := getCookie(r, `token`)
+	catcherr.HandleError(err)
+
 	var (
 		claims  = &jwtClaims{}
 		keyfunc = func(tkn *jwt.Token) (interface{}, error) { return jwtKey, nil }
 	)
 
 	token, err := jwt.ParseWithClaims(tokenCookie, claims, keyfunc)
-	if errors.Is(err, jwt.ErrSignatureInvalid) {
-		catcherr.HandleError(w, catcherr.Unathorized, err)
-	}
-	catcherr.HandleError(w, catcherr.BadRequest, err)
+	catcherr.HandleError(err)
 
-	if claims.Login != getCookie(w, r, `login`) {
-		err := errors.New(`Invalid login`)
-		catcherr.HandleError(w, catcherr.Unathorized, err)
+	switch {
+	case claims.Login != loginCookie:
+		catcherr.HandleError(jwt.ErrSignatureInvalid)
+	case !token.Valid:
+		catcherr.HandleError(jwt.ErrSignatureInvalid)
 	}
-
-	if !token.Valid {
-		err := errors.New(`Invalid token`)
-		catcherr.HandleError(w, catcherr.Unathorized, err)
-	}
+	return err
 }
 
-func GetUserID(ctx context.Context, w http.ResponseWriter, r *http.Request) (userID string) {
-	defer catcherr.RecoverState(`api.GetUserID`)
-	parseToken(w, r)
+func checkAuth(r *http.Request) (err error) {
+	defer func() { err = catcherr.RecoverAndReturnError() }()
+
+	login, err := getCookie(r, `login`)
+	catcherr.HandleError(err)
+
+	return parseToken(r, login)
+}
+
+func registerUser(ctx context.Context, acc database.User) (err error) {
+	defer func() { err = catcherr.RecoverAndReturnError() }()
+
+	acc.Password, err = user.GeneratePasswordHash(acc.Password)
+	catcherr.HandleError(err)
+
+	acc, err = database.RegisterUser(ctx, acc)
+	catcherr.HandleError(err)
 
 	var (
-		login     = getCookie(w, r, `login`)
-		user, err = database.GetUserInfo(ctx, login) // int64
+		userID = fmt.Sprint(acc.ID)
+		dir    = getUserDir(userID)
 	)
-	catcherr.HandleError(w, catcherr.InternalServerError, err)
-	return fmt.Sprint(user.ID)
+
+	return os.Mkdir(dir, os.ModePerm)
+}
+
+func GetUserID(ctx context.Context, r *http.Request) (userID string, err error) {
+	defer func() { err = catcherr.RecoverAndReturnError() }()
+
+	login, err := getCookie(r, `login`)
+	catcherr.HandleError(err)
+
+	err = parseToken(r, login)
+	catcherr.HandleError(err)
+
+	user, err := database.GetUserInfo(ctx, login)
+	catcherr.HandleError(err)
+
+	return fmt.Sprint(user.ID), err
 }

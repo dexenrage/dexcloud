@@ -18,6 +18,7 @@ package catcherr
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -31,20 +32,27 @@ func init() {
 	InternalServerError.InternalServerError()
 }
 
-func HandleError(w http.ResponseWriter, c CustomError, err error) {
+func HandleError(err error) {
 	if err != nil {
-		sendErrorData(w, response{c.StatusCode, c.Description})
 		panic(err)
 	}
 }
 
-func HandleErrorChannel(errChan chan<- ErrorChan, c CustomError, err error) {
+func HandleAndResponse(w http.ResponseWriter, c CustomError, err error) {
 	if err != nil {
-		errChan <- ErrorChan{c, err}
+		sendErrorData(w, c)
+		panic(err)
 	}
 }
 
-func RecoverState(sender string) {
+func RecoverAndReturnError() (err error) {
+	if r := recover(); r != nil {
+		return errors.New(fmt.Sprint(r))
+	}
+	return nil
+}
+
+func Recover(sender string) {
 	if r := recover(); r != nil {
 		logError(sender, r)
 	}
@@ -55,11 +63,11 @@ func logError(sender string, data interface{}) {
 	log.Printf(tmpl, sender, data)
 }
 
-func sendErrorData(w http.ResponseWriter, resp response) {
+func sendErrorData(w http.ResponseWriter, c CustomError) {
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(resp.StatusCode)
+	w.WriteHeader(c.StatusCode)
 
-	err := json.NewEncoder(w).Encode(resp)
+	err := json.NewEncoder(w).Encode(c)
 	if err != nil {
 		logError(`catcherr.sendErrorData`, fmt.Sprint(`Can't send data to user. Reason: `, err))
 	}
