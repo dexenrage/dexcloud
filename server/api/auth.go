@@ -53,15 +53,10 @@ func createToken(login string) (data tokenData, err error) {
 
 }
 
-func getCookie(r *http.Request, name string) (value string, err error) {
-	c, err := r.Cookie(name)
-	return c.Value, err
-}
-
 func parseToken(r *http.Request, loginCookie string) (err error) {
 	defer func() { err = catcherr.RecoverAndReturnError() }()
 
-	tokenCookie, err := getCookie(r, `token`)
+	tokenCookie, err := r.Cookie(`token`)
 	catcherr.HandleError(err)
 
 	var (
@@ -69,7 +64,7 @@ func parseToken(r *http.Request, loginCookie string) (err error) {
 		keyfunc = func(tkn *jwt.Token) (interface{}, error) { return jwtKey, nil }
 	)
 
-	token, err := jwt.ParseWithClaims(tokenCookie, claims, keyfunc)
+	token, err := jwt.ParseWithClaims(tokenCookie.Value, claims, keyfunc)
 	catcherr.HandleError(err)
 
 	switch {
@@ -82,12 +77,17 @@ func parseToken(r *http.Request, loginCookie string) (err error) {
 }
 
 func checkAuth(r *http.Request) (err error) {
-	defer func() { err = catcherr.RecoverAndReturnError() }()
+	defer func() {
+		err = catcherr.RecoverAndReturnError()
+	}()
 
-	login, err := getCookie(r, `login`)
+	login, err := r.Cookie(`login`)
 	catcherr.HandleError(err)
 
-	return parseToken(r, login)
+	err = parseToken(r, login.Value)
+	catcherr.HandleError(err)
+
+	return err
 }
 
 func registerUser(ctx context.Context, acc database.User) (err error) {
@@ -110,13 +110,13 @@ func registerUser(ctx context.Context, acc database.User) (err error) {
 func GetUserID(ctx context.Context, r *http.Request) (userID string, err error) {
 	defer func() { err = catcherr.RecoverAndReturnError() }()
 
-	login, err := getCookie(r, `login`)
+	login, err := r.Cookie(`login`)
 	catcherr.HandleError(err)
 
-	err = parseToken(r, login)
+	err = parseToken(r, login.Value)
 	catcherr.HandleError(err)
 
-	user, err := database.GetUserInfo(ctx, login)
+	user, err := database.GetUserInfo(ctx, login.Value)
 	catcherr.HandleError(err)
 
 	return fmt.Sprint(user.ID), err

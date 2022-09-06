@@ -49,7 +49,7 @@ func RecoverAndReturnError() (err error) {
 	if r := recover(); r != nil {
 		return errors.New(fmt.Sprint(r))
 	}
-	return nil
+	return err
 }
 
 func Recover(sender string) {
