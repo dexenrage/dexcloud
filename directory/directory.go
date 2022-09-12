@@ -25,20 +25,18 @@ import (
 )
 
 const (
-	IndexHTTP, Slash = `/`, `/`
-	RegisterHTTP     = `/register`
-	LoginHTTP        = `/login`
-	ProfileHTTP      = `/profile`
-	StaticHTTP       = `/static/`
-	UploadsHTTP      = `/uploads/`
+	Slash       = `/`
+	StaticHTTP  = `/static/`
+	UploadsHTTP = `/uploads/`
 
-	ApiCheckAuthHTTP = `/api/checkauth`
-	ApiRegisterHTTP  = `/api/register`
-	ApiLoginHTTP     = `/api/login`
-	ApiUploadHTTP    = `/api/upload`
-	ApiFileListHTTP  = `/api/filelist`
+	ApiCheckAuthHTTP = `/api/auth/check`
+	ApiRegisterHTTP  = `/api/auth/register`
+	ApiLoginHTTP     = `/api/auth/login`
 
-	StaticFilesRoot = "web"
+	ApiUploadFileHTTP = `/api/files/upload`
+	ApiFileListHTTP   = `/api/files/list`
+	ApiDeleteFileHTTP = `/api/files/delete`
+
 	UserUploadsRoot = "userdata"
 )
 
@@ -47,24 +45,12 @@ func CleanPath(elem ...string) string {
 	return filepath.Clean(path)
 }
 
-func IndexPage() string { return CleanPath(StaticFilesRoot, "index.html") }
-
-func RegisterPage() string { return CleanPath(StaticFilesRoot, "register.html") }
-
-func LoginPage() string { return CleanPath(StaticFilesRoot, "login.html") }
-
-func ProfilePage() string { return CleanPath(StaticFilesRoot, "profile.html") }
-
-func StaticFiles() string { return CleanPath(StaticFilesRoot, `static`) }
-
 func UserUploads() string { return CleanPath(UserUploadsRoot, `uploads`) }
 
 func CreateCriticalDirectories() (err error) {
 	defer func() { err = catcherr.RecoverAndReturnError() }()
 
 	directories := [4]string{
-		StaticFilesRoot,
-		StaticFiles(),
 		UserUploadsRoot,
 		UserUploads(),
 	}

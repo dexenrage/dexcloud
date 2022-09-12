@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"os"
 	"server/catcherr"
+	"server/config"
 	"server/database"
 	"server/user"
 	"time"
@@ -29,7 +30,7 @@ import (
 	"github.com/golang-jwt/jwt/v4"
 )
 
-var jwtKey = []byte(`QHhpZGlvCg==`) // UNSAFE
+var jwtKey = config.Bytes(`jwt_key`)
 
 func createToken(login string) (data tokenData, err error) {
 	expirationTime := jwt.NewNumericDate(time.Now().Add(15 * time.Minute))
@@ -76,18 +77,18 @@ func parseToken(r *http.Request, loginCookie string) (err error) {
 	return err
 }
 
-func checkAuth(r *http.Request) (err error) {
+func checkAuth(r *http.Request) (loginCookie *http.Cookie, err error) {
 	defer func() {
 		err = catcherr.RecoverAndReturnError()
 	}()
 
-	login, err := r.Cookie(`login`)
+	loginCookie, err = r.Cookie(`login`)
 	catcherr.HandleError(err)
 
-	err = parseToken(r, login.Value)
+	err = parseToken(r, loginCookie.Value)
 	catcherr.HandleError(err)
 
-	return err
+	return loginCookie, err
 }
 
 func registerUser(ctx context.Context, acc database.User) (err error) {
@@ -110,10 +111,7 @@ func registerUser(ctx context.Context, acc database.User) (err error) {
 func GetUserID(ctx context.Context, r *http.Request) (userID string, err error) {
 	defer func() { err = catcherr.RecoverAndReturnError() }()
 
-	login, err := r.Cookie(`login`)
-	catcherr.HandleError(err)
-
-	err = parseToken(r, login.Value)
+	login, err := checkAuth(r)
 	catcherr.HandleError(err)
 
 	user, err := database.GetUserInfo(ctx, login.Value)

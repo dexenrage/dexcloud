@@ -21,6 +21,8 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
+	"os"
+	"path/filepath"
 
 	"server/catcherr"
 	"server/database"
@@ -31,11 +33,15 @@ import (
 )
 
 func HandleApi(r *mux.Router) {
-	r.HandleFunc(directory.ApiCheckAuthHTTP, checkAuthHandler).Methods(http.MethodGet)
+	// Auth
+	r.HandleFunc(directory.ApiCheckAuthHTTP, authCheckHandler).Methods(http.MethodGet)
 	r.HandleFunc(directory.ApiRegisterHTTP, registerHandler).Methods(http.MethodPost)
 	r.HandleFunc(directory.ApiLoginHTTP, loginHandler).Methods(http.MethodPost)
-	r.HandleFunc(directory.ApiUploadHTTP, uploadHandler).Methods(http.MethodPut)
+
+	// Files
+	r.HandleFunc(directory.ApiUploadFileHTTP, fileUploadHandler).Methods(http.MethodPut)
 	r.HandleFunc(directory.ApiFileListHTTP, fileListHandler).Methods(http.MethodGet)
+	r.HandleFunc(directory.ApiDeleteFileHTTP, fileDeletionHandler).Methods(http.MethodDelete)
 }
 
 func getUserDir(userID string) string {
@@ -62,13 +68,14 @@ func fileListHandler(w http.ResponseWriter, r *http.Request) {
 	catcherr.HandleError(err)
 }
 
-func checkAuthHandler(w http.ResponseWriter, r *http.Request) {
+func authCheckHandler(w http.ResponseWriter, r *http.Request) {
 	defer catcherr.Recover(`api.checkAuthHandler()`)
 
-	err := checkAuth(r)
+	_, err := checkAuth(r)
 	catcherr.HandleAndResponse(w, catcherr.Unathorized, err)
 
-	err = response.Send(w, responseData{http.StatusOK, http.StatusText(http.StatusOK)})
+	statusText := http.StatusText(http.StatusOK)
+	err = response.Send(w, responseData{http.StatusOK, statusText})
 	catcherr.HandleError(err)
 }
 
@@ -117,15 +124,15 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 	catcherr.HandleAndResponse(w, catcherr.InternalServerError, err)
 }
 
-func uploadHandler(w http.ResponseWriter, r *http.Request) {
+func fileUploadHandler(w http.ResponseWriter, r *http.Request) {
 	defer catcherr.Recover(`api.uploadHandler()`)
 	ctx := r.Context()
 
-	err := r.ParseMultipartForm(32 << 20)
-	catcherr.HandleAndResponse(w, catcherr.InternalServerError, err)
-
 	uid, err := GetUserID(ctx, r)
 	catcherr.HandleAndResponse(w, catcherr.Unathorized, err)
+
+	err = r.ParseMultipartForm(32 << 20)
+	catcherr.HandleAndResponse(w, catcherr.InternalServerError, err)
 
 	destination := getUserDir(uid)
 
@@ -159,6 +166,35 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	err = user.SaveUploadedFiles(fileData)
 	catcherr.HandleAndResponse(w, catcherr.InternalServerError, err)
 
-	err = response.Send(w, responseData{http.StatusOK, http.StatusText(http.StatusOK)})
+	statusText := http.StatusText(http.StatusOK)
+	err = response.Send(w, responseData{http.StatusOK, statusText})
+	catcherr.HandleError(err)
+}
+
+func fileDeletionHandler(w http.ResponseWriter, r *http.Request) {
+	defer catcherr.Recover(`api.fileDeletionHandler()`)
+
+	ctx := r.Context()
+
+	uid, err := GetUserID(ctx, r)
+	catcherr.HandleAndResponse(w, catcherr.Unathorized, err)
+
+	userDirectory := getUserDir(uid)
+
+	bodyBuffer, err := io.ReadAll(r.Body)
+	catcherr.HandleAndResponse(w, catcherr.InternalServerError, err)
+
+	var fileList fileListStruct
+	err = json.Unmarshal(bodyBuffer, &fileList)
+	catcherr.HandleAndResponse(w, catcherr.InternalServerError, err)
+
+	for _, v := range fileList.Files {
+		path := filepath.Join(userDirectory, v)
+		err = os.Remove(path)
+		catcherr.HandleAndResponse(w, catcherr.InternalServerError, err)
+	}
+
+	statusText := http.StatusText(http.StatusOK)
+	err = response.Send(w, responseData{http.StatusOK, statusText})
 	catcherr.HandleError(err)
 }

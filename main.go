@@ -19,7 +19,6 @@ package main
 import (
 	"errors"
 	"fmt"
-	"html/template"
 	"net/http"
 	"server/api"
 	"server/catcherr"
@@ -36,15 +35,8 @@ func init() {
 }
 
 func initHandlers(r *mux.Router) {
-	// Pages
-	r.HandleFunc(directory.IndexHTTP, indexHandler).Methods(http.MethodGet)
-	r.HandleFunc(directory.RegisterHTTP, registerHandler).Methods(http.MethodGet)
-	r.HandleFunc(directory.LoginHTTP, loginHandler).Methods(http.MethodGet)
-	r.HandleFunc(directory.ProfileHTTP, profileHandler).Methods(http.MethodGet)
-
 	// FileServers
 	r.PathPrefix(directory.UploadsHTTP).HandlerFunc(uploadsFileServerHandler).Methods(http.MethodGet)
-	r.PathPrefix(directory.StaticHTTP).HandlerFunc(staticFileServerHandler).Methods(http.MethodGet)
 
 	// API
 	api.HandleApi(r)
@@ -75,12 +67,6 @@ func getFileServerHandler(w http.ResponseWriter, r *http.Request, prefix, dir st
 	return http.StripPrefix(prefix, fs)
 }
 
-func staticFileServerHandler(w http.ResponseWriter, r *http.Request) {
-	defer catcherr.Recover(`main.staticFileServerHandler`)
-	handler := getFileServerHandler(w, r, directory.StaticHTTP, directory.StaticFiles())
-	handler.ServeHTTP(w, r)
-}
-
 func uploadsFileServerHandler(w http.ResponseWriter, r *http.Request) {
 	defer catcherr.Recover(`main.uploadsFileServerHandler()`)
 	ctx := r.Context()
@@ -97,37 +83,4 @@ func uploadsFileServerHandler(w http.ResponseWriter, r *http.Request) {
 
 	handler := getFileServerHandler(w, r, directory.UploadsHTTP, directory.UserUploads())
 	handler.ServeHTTP(w, r)
-}
-
-func indexHandler(w http.ResponseWriter, r *http.Request) {
-	defer catcherr.Recover(`main.indexHandler`)
-	executeTemplate(w, directory.IndexPage())
-}
-
-func profileHandler(w http.ResponseWriter, r *http.Request) {
-	defer catcherr.Recover(`main.profileHandler`)
-	executeTemplate(w, directory.ProfilePage())
-}
-
-func registerHandler(w http.ResponseWriter, r *http.Request) {
-	defer catcherr.Recover(`main.registerHandler`)
-	executeTemplate(w, directory.RegisterPage())
-}
-
-func loginHandler(w http.ResponseWriter, r *http.Request) {
-	defer catcherr.Recover(`main.loginHandler`)
-	executeTemplate(w, directory.LoginPage())
-}
-
-func executeTemplate(w http.ResponseWriter, directory string) {
-	if directory == `` {
-		err := errors.New(`Template directory is empty`)
-		catcherr.HandleAndResponse(w, catcherr.InternalServerError, err)
-	}
-
-	tmpl, err := template.ParseFiles(directory)
-	catcherr.HandleAndResponse(w, catcherr.InternalServerError, err)
-
-	err = tmpl.Execute(w, nil)
-	catcherr.HandleAndResponse(w, catcherr.InternalServerError, err)
 }
