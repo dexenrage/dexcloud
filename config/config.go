@@ -33,6 +33,10 @@ func init() {
 	catcherr.HandleError(err)
 }
 
+func String(path string) string {
+	return cfg.String(path)
+}
+
 func Bytes(path string) []byte {
 	return cfg.Bytes(path)
 }

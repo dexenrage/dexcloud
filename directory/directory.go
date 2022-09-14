@@ -50,7 +50,7 @@ func UserUploads() string { return CleanPath(UserUploadsRoot, `uploads`) }
 func CreateCriticalDirectories() (err error) {
 	defer func() { err = catcherr.RecoverAndReturnError() }()
 
-	directories := [4]string{
+	directories := [2]string{
 		UserUploadsRoot,
 		UserUploads(),
 	}

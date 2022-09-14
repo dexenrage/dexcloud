@@ -19,7 +19,9 @@ package database
 import (
 	"context"
 	"database/sql"
+	"net/url"
 	"server/catcherr"
+	"server/config"
 
 	"github.com/uptrace/bun"
 	"github.com/uptrace/bun/dialect/pgdialect"
@@ -32,9 +34,30 @@ var db *bun.DB
 func init() {
 	ctx := context.Background()
 
+	var (
+		host     = config.String(`db_host`)
+		username = config.String(`db_user`)
+		password = config.String(`db_pass`)
+		sslmode  = config.String(`db_sslmode`)
+		dbName   = config.String(`db_name`)
+
+		user = url.UserPassword(username, password)
+	)
+
+	dsn := url.URL{
+		Scheme: `postgres`,
+		Host:   host,
+		User:   user,
+		Path:   dbName,
+	}
+	{
+		q := dsn.Query()
+		q.Add(`sslmode`, sslmode)
+		dsn.RawQuery = q.Encode()
+	}
+
 	// Open a PostgreSQL database.
-	dsn := "postgres://postgres:123456@localhost:5432/users?sslmode=disable"
-	pgdb := sql.OpenDB(pgdriver.NewConnector(pgdriver.WithDSN(dsn)))
+	pgdb := sql.OpenDB(pgdriver.NewConnector(pgdriver.WithDSN(dsn.String())))
 
 	// Create a Bun db on top of it.
 	db = bun.NewDB(pgdb, pgdialect.New())

@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"server/api"
 	"server/catcherr"
+	"server/config"
 	"server/directory"
 	"strings"
 	"time"
@@ -49,7 +50,7 @@ func main() {
 	initHandlers(r)
 
 	srv := http.Server{
-		Addr:         "localhost:80",
+		Addr:         config.String(`host`),
 		Handler:      r,
 		WriteTimeout: 15 * time.Second,
 		ReadTimeout:  15 * time.Second,
@@ -58,7 +59,7 @@ func main() {
 }
 
 func getFileServerHandler(w http.ResponseWriter, r *http.Request, prefix, dir string) http.Handler {
-	if strings.HasSuffix(r.URL.Path, "/") {
+	if strings.HasSuffix(r.URL.Path, directory.Slash) {
 		err := errors.New(catcherr.Forbidden.Description)
 		catcherr.HandleAndResponse(w, catcherr.Forbidden, err)
 	}

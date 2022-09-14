@@ -30,8 +30,6 @@ import (
 	"github.com/golang-jwt/jwt/v4"
 )
 
-var jwtKey = config.Bytes(`jwt_key`)
-
 func createToken(login string) (data tokenData, err error) {
 	expirationTime := jwt.NewNumericDate(time.Now().Add(15 * time.Minute))
 
@@ -43,7 +41,7 @@ func createToken(login string) (data tokenData, err error) {
 	}
 	tkn := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 
-	token, err := tkn.SignedString(jwtKey)
+	token, err := tkn.SignedString(config.Bytes(`jwt_key`))
 	expires := expirationTime.UTC().Format(http.TimeFormat)
 
 	return tokenData{
@@ -62,7 +60,8 @@ func parseToken(r *http.Request, loginCookie string) (err error) {
 
 	var (
 		claims  = &jwtClaims{}
-		keyfunc = func(tkn *jwt.Token) (interface{}, error) { return jwtKey, nil }
+		key     = config.Bytes(`jwt_key`)
+		keyfunc = func(tkn *jwt.Token) (interface{}, error) { return key, nil }
 	)
 
 	token, err := jwt.ParseWithClaims(tokenCookie.Value, claims, keyfunc)

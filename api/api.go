@@ -131,7 +131,7 @@ func fileUploadHandler(w http.ResponseWriter, r *http.Request) {
 	uid, err := GetUserID(ctx, r)
 	catcherr.HandleAndResponse(w, catcherr.Unathorized, err)
 
-	err = r.ParseMultipartForm(32 << 20)
+	err = r.ParseMultipartForm(32 << 20) // 32 MB
 	catcherr.HandleAndResponse(w, catcherr.InternalServerError, err)
 
 	destination := getUserDir(uid)
