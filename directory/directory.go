@@ -25,42 +25,29 @@ import (
 )
 
 const (
-	Slash       = `/`
-	StaticHTTP  = `/static/`
-	UploadsHTTP = `/uploads/`
+	APIFileServer = `/api/file/`
 
-	ApiCheckAuthHTTP = `/api/auth/check`
-	ApiRegisterHTTP  = `/api/auth/register`
-	ApiLoginHTTP     = `/api/auth/login`
+	APIAuthCheck = `/api/auth/check`
+	APIRegister  = `/api/auth/register`
+	APILogin     = `/api/auth/login`
 
-	ApiUploadFileHTTP = `/api/files/upload`
-	ApiFileListHTTP   = `/api/files/list`
-	ApiDeleteFileHTTP = `/api/files/delete`
+	APIFileUpload = `/api/file/upload`
+	APIFileList   = `/api/file/list`
+	APIFileDelete = `/api/file/delete`
 
-	UserUploadsRoot = "userdata"
+	userDataFolder = `userdata`
 )
 
-func CleanPath(elem ...string) string {
-	path := filepath.Join(elem...)
-	return filepath.Clean(path)
+func init() {
+	err := os.Mkdir(userDataFolder, os.ModePerm)
+	if errors.Is(err, fs.ErrExist) {
+		return
+	}
+	catcherr.HandleError(err)
 }
 
-func UserUploads() string { return CleanPath(UserUploadsRoot, `uploads`) }
+func UserData() string { return CleanPath(userDataFolder) }
 
-func CreateCriticalDirectories() (err error) {
-	defer func() { err = catcherr.RecoverAndReturnError() }()
-
-	directories := [2]string{
-		UserUploadsRoot,
-		UserUploads(),
-	}
-
-	for _, v := range directories {
-		err := os.Mkdir(v, os.ModePerm)
-		if errors.Is(err, fs.ErrExist) {
-			continue
-		}
-		catcherr.HandleError(err)
-	}
-	return err
+func CleanPath(elem ...string) string {
+	return filepath.Clean(filepath.Join(elem...))
 }

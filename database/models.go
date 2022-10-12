@@ -14,31 +14,20 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package api
+package database
 
-import (
-	"github.com/golang-jwt/jwt/v4"
-)
+import "github.com/uptrace/bun"
 
-type (
-	fileListStruct struct {
-		UserID string   `json:"userid"`
-		Files  []string `json:"files,omitempty"`
-	}
+type User struct {
+	bun.BaseModel `bun:"table:users,alias:u"`
+	ID            int64  `bun:"id,pk,autoincrement"`
+	Login         string `bun:"login,notnull" json:"login"`
+	Password      string `bun:"password,notnull" json:"password"`
+}
 
-	jwtClaims struct {
-		jwt.RegisteredClaims
-		Login string `json:"login"`
-	}
-
-	tokenData struct {
-		Login   string `json:"login"`
-		Token   string `json:"token"`
-		Expires string `json:"expires"`
-	}
-
-	responseData struct {
-		StatusCode int         `json:"status"`
-		Data       interface{} `json:"data"`
-	}
-)
+type File struct {
+	bun.BaseModel `bun:"table:files,alias:f"`
+	UserID        int64  `bun:"uid,notnull"`
+	Name          string `bun:"name,notnull" json:"filename"`
+	Checksum      string `bun:"checksum,notnull" json:"checksum"`
+}

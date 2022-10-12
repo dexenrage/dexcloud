@@ -24,19 +24,24 @@ import (
 	"github.com/knadh/koanf/providers/file"
 )
 
+const (
+	JWTKey = `jwt_key`
+	Host   = `host`
+
+	DBHost     = `db_host`
+	DBUser     = `db_user`
+	DBPassword = `db_pass`
+	DBSSLMode  = `db_sslmode`
+	DBName     = `db_name`
+)
+
 var cfg *koanf.Koanf
 
 func init() {
 	cfg = koanf.New(`.`)
-
 	err := cfg.Load(file.Provider(`config.yml`), yaml.Parser())
 	catcherr.HandleError(err)
 }
 
-func String(path string) string {
-	return cfg.String(path)
-}
-
-func Bytes(path string) []byte {
-	return cfg.Bytes(path)
-}
+func String(path string) string { return cfg.String(path) }
+func Bytes(path string) []byte  { return cfg.Bytes(path) }

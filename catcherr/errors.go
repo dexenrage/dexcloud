@@ -18,18 +18,16 @@ package catcherr
 
 import "net/http"
 
+type CustomError struct {
+	StatusCode  int
+	Description string
+}
+
 var (
-	BadRequest          CustomError
 	Unathorized         CustomError
 	Forbidden           CustomError
-	NotFound            CustomError
 	InternalServerError CustomError
 )
-
-func (e *CustomError) BadRequest() {
-	e.StatusCode = http.StatusBadRequest
-	e.Description = http.StatusText(http.StatusBadRequest)
-}
 
 func (e *CustomError) Unathorized() {
 	e.StatusCode = http.StatusUnauthorized
@@ -39,11 +37,6 @@ func (e *CustomError) Unathorized() {
 func (e *CustomError) Forbidden() {
 	e.StatusCode = http.StatusForbidden
 	e.Description = http.StatusText(http.StatusForbidden)
-}
-
-func (e *CustomError) NotFound() {
-	e.StatusCode = http.StatusNotFound
-	e.Description = http.StatusText(http.StatusNotFound)
 }
 
 func (e *CustomError) InternalServerError() {

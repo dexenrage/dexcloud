@@ -35,17 +35,18 @@ func init() {
 	ctx := context.Background()
 
 	var (
-		host     = config.String(`db_host`)
-		username = config.String(`db_user`)
-		password = config.String(`db_pass`)
-		sslmode  = config.String(`db_sslmode`)
-		dbName   = config.String(`db_name`)
+		host     = config.String(config.DBHost)
+		username = config.String(config.DBUser)
+		password = config.String(config.DBPassword)
+		sslmode  = config.String(config.DBSSLMode)
+		dbName   = config.String(config.DBName)
 
 		user = url.UserPassword(username, password)
 	)
 
+	const scheme = `postgres`
 	dsn := url.URL{
-		Scheme: `postgres`,
+		Scheme: scheme,
 		Host:   host,
 		User:   user,
 		Path:   dbName,
@@ -67,19 +68,65 @@ func init() {
 
 	_, err := db.NewCreateTable().Model((*User)(nil)).IfNotExists().Exec(ctx)
 	catcherr.HandleError(err)
+
+	_, err = db.NewCreateTable().Model((*File)(nil)).IfNotExists().Exec(ctx)
+	catcherr.HandleError(err)
 }
 
 func RegisterUser(ctx context.Context, u User) (user User, err error) {
 	defer func() { err = catcherr.RecoverAndReturnError() }()
-
 	_, err = db.NewInsert().Model(&u).Exec(ctx)
-	catcherr.HandleError(err)
-
-	return GetUserInfo(ctx, u.Login)
+	if err != nil {
+		return User{}, err
+	}
+	return GetUser(ctx, u.Login)
 }
 
-func GetUserInfo(ctx context.Context, login string) (user User, err error) {
+func GetUser(ctx context.Context, login string) (user User, err error) {
 	u := new(User)
 	err = db.NewSelect().Model(u).Where(`login = ?`, login).Scan(ctx)
 	return *u, err
+}
+
+func GetFileList(ctx context.Context, login string) (files []File, err error) {
+	u, err := GetUser(ctx, login)
+	if err != nil {
+		return nil, err
+	}
+
+	err = db.NewSelect().Model(&files).Where(`f.uid = ?`, u.ID).Scan(ctx)
+	return files, err
+}
+
+func SaveFileInfo(ctx context.Context, login, filename, checksum string) error {
+	u, err := GetUser(ctx, login)
+	if err != nil {
+		return err
+	}
+
+	f := new(File)
+	f.UserID = u.ID
+	f.Name = filename
+	f.Checksum = checksum
+
+	_, err = db.NewInsert().Model(f).Exec(ctx)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func RemoveFileInfo(ctx context.Context, login, checksum string) error {
+	u, err := GetUser(ctx, login)
+	if err != nil {
+		return err
+	}
+
+	f := new(File)
+	_, err = db.NewDelete().Model(f).Where(`uid = ?`, u.ID).
+		Where(`checksum = ?`, checksum).Exec(ctx)
+	if err != nil {
+		return err
+	}
+	return nil
 }

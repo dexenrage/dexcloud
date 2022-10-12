@@ -14,31 +14,35 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package api
+package response
 
 import (
 	"encoding/json"
 	"net/http"
-	"server/catcherr"
 )
+
+type Data struct {
+	StatusCode int `json:"status"`
+	Data       any `json:"data"`
+}
 
 const (
-	defaultResponseType  = "Content-Type"
-	defaultResponseValue = "application/json"
+	defaultType  = "Content-Type"
+	defaultValue = "application/json"
 )
 
-var response responseData
-
-func (*responseData) Send(w http.ResponseWriter, resp responseData) (err error) {
-	defer func() { err = catcherr.RecoverAndReturnError() }()
-
-	w.Header().Set(defaultResponseType, defaultResponseValue)
+func Send(w http.ResponseWriter, resp Data) error {
+	w.Header().Set(defaultType, defaultValue)
 	w.WriteHeader(resp.StatusCode)
 
 	jsonData, err := json.Marshal(resp)
-	catcherr.HandleError(err)
+	if err != nil {
+		return err
+	}
 
 	_, err = w.Write(jsonData)
-	catcherr.HandleError(err)
-	return err
+	if err != nil {
+		return err
+	}
+	return nil
 }

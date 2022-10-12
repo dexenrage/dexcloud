@@ -18,26 +18,109 @@ package user
 
 import (
 	"context"
-	"errors"
+	"crypto/sha256"
 	"io"
-	"io/fs"
+	"mime/multipart"
 	"os"
 	"path/filepath"
-	"server/catcherr"
+	"server/auth"
+	"server/database"
+	"server/directory"
 
 	"golang.org/x/crypto/bcrypt"
 )
 
-func GeneratePasswordHash(password string) (hash string, err error) {
-	b, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
-	return string(b), err
+func Register(ctx context.Context, u database.User) (token auth.Token, err error) {
+	u.Password, err = generatePasswordHash(ctx, u.Password)
+	if err != nil {
+		return auth.Token{}, err
+	}
+
+	u, err = database.RegisterUser(ctx, u)
+	if err != nil {
+		return auth.Token{}, err
+	}
+
+	token, err = auth.CreateToken(ctx, u.Login)
+	if err != nil {
+		return auth.Token{}, err
+	}
+	return token, nil
 }
 
-func ComparsePasswords(ctx context.Context, password, hash string) error {
+func Login(ctx context.Context, u database.User) (token auth.Token, err error) {
+	userInfo, err := database.GetUser(ctx, u.Login)
+	if err != nil {
+		return auth.Token{}, err
+	}
+
+	err = comparsePasswords(ctx, u.Password, userInfo.Password)
+	if err != nil {
+		return auth.Token{}, err
+	}
+
+	token, err = auth.CreateToken(ctx, u.Login)
+	if err != nil {
+		return auth.Token{}, err
+	}
+	return token, nil
+}
+
+func generatePasswordHash(ctx context.Context, password string) (hash string, err error) {
+	if ctx.Err() != nil {
+		return ``, err
+	}
+	b, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return ``, err
+	}
+	hash = string(b)
+	return hash, nil
+}
+
+func comparsePasswords(ctx context.Context, password, hash string) error {
 	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
 }
 
-func SaveUploadedFiles(files []FileStruct) (err error) {
+type FileData struct {
+	File       multipart.File
+	FileHeader *multipart.FileHeader
+}
+
+func SaveFile(ctx context.Context, f *multipart.FileHeader) (sha256sum string, err error) {
+	if ctx.Err() != nil {
+		return ``, ctx.Err()
+	}
+
+	file, err := f.Open()
+	if err != nil {
+		return ``, err
+	}
+	defer file.Close()
+
+	checksum := sha256.New()
+	_, err = io.Copy(checksum, file)
+	if err != nil {
+		return ``, err
+	}
+
+	sha256sum = string(checksum.Sum(nil))
+	return sha256sum, nil
+}
+
+func RemoveFile(ctx context.Context, checksum string) error {
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+
+	path := filepath.Join(directory.UserData(), checksum)
+	if err := os.Remove(path); err != nil {
+		return err
+	}
+	return nil
+}
+
+/*func SaveUploadedFiles(files []FileStruct) (err error) {
 	defer func() { err = catcherr.RecoverAndReturnError() }()
 	for _, f := range files {
 		path := filepath.Join(f.Directory, f.FileHeader.Filename)
@@ -50,8 +133,8 @@ func SaveUploadedFiles(files []FileStruct) (err error) {
 		catcherr.HandleError(err)
 	}
 	return err
-}
-
+}*/
+/*
 func GetFiles(dir string) (files []string, err error) {
 	defer func() { err = catcherr.RecoverAndReturnError() }()
 
@@ -65,4 +148,4 @@ func GetFiles(dir string) (files []string, err error) {
 		files = append(files, f.Name())
 	}
 	return files, err
-}
+}*/

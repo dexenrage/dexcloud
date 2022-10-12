@@ -19,36 +19,51 @@ package api
 import (
 	"encoding/json"
 	"io"
-	"mime/multipart"
 	"net/http"
-	"os"
-	"path/filepath"
 
+	"server/auth"
 	"server/catcherr"
 	"server/database"
 	"server/directory"
+	"server/response"
 	"server/user"
 
 	"github.com/gorilla/mux"
 )
 
-func HandleApi(r *mux.Router) {
+func Handle(r *mux.Router) {
 	// Auth
-	r.HandleFunc(directory.ApiCheckAuthHTTP, authCheckHandler).Methods(http.MethodGet)
-	r.HandleFunc(directory.ApiRegisterHTTP, registerHandler).Methods(http.MethodPost)
-	r.HandleFunc(directory.ApiLoginHTTP, loginHandler).Methods(http.MethodPost)
+	r.HandleFunc(directory.APIAuthCheck, authCheckFunc).Methods(http.MethodGet)
+	r.HandleFunc(directory.APIRegister, registerFunc).Methods(http.MethodPost)
+	r.HandleFunc(directory.APILogin, loginFunc).Methods(http.MethodPost)
 
 	// Files
-	r.HandleFunc(directory.ApiUploadFileHTTP, fileUploadHandler).Methods(http.MethodPut)
-	r.HandleFunc(directory.ApiFileListHTTP, fileListHandler).Methods(http.MethodGet)
-	r.HandleFunc(directory.ApiDeleteFileHTTP, fileDeletionHandler).Methods(http.MethodDelete)
+	r.HandleFunc(directory.APIFileUpload, fileUploadFunc).Methods(http.MethodPut)
+	r.HandleFunc(directory.APIFileDelete, fileDeleteFunc).Methods(http.MethodDelete)
+	r.HandleFunc(directory.APIFileList, fileListFunc).Methods(http.MethodGet)
 }
 
-func getUserDir(userID string) string {
-	return directory.CleanPath(directory.UserUploads(), userID)
+func fileListFunc(w http.ResponseWriter, r *http.Request) {
+	defer catcherr.Recover(`api.fileListFunc()`)
+	ctx := r.Context()
+
+	login, err := auth.GetLoginFromCookie(r)
+	catcherr.HandleAndResponse(w, catcherr.Unathorized, err)
+
+	err = auth.VerifyUser(r, login)
+	catcherr.HandleAndResponse(w, catcherr.Unathorized, err)
+
+	files, err := database.GetFileList(ctx, login)
+	catcherr.HandleAndResponse(w, catcherr.InternalServerError, err)
+
+	fileList, err := json.Marshal(files)
+	catcherr.HandleAndResponse(w, catcherr.InternalServerError, err)
+
+	err = response.Send(w, response.Data{StatusCode: http.StatusOK, Data: fileList})
+	catcherr.HandleError(err)
 }
 
-func fileListHandler(w http.ResponseWriter, r *http.Request) {
+/*func fileListHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	uid, err := GetUserID(ctx, r)
@@ -66,135 +81,120 @@ func fileListHandler(w http.ResponseWriter, r *http.Request) {
 
 	err = response.Send(w, responseData{http.StatusOK, data})
 	catcherr.HandleError(err)
-}
+}*/
 
-func authCheckHandler(w http.ResponseWriter, r *http.Request) {
-	defer catcherr.Recover(`api.checkAuthHandler()`)
+func authCheckFunc(w http.ResponseWriter, r *http.Request) {
+	defer catcherr.Recover(`api.authCheckFunc()`)
 
-	_, err := checkAuth(r)
+	login, err := auth.GetLoginFromCookie(r)
+	catcherr.HandleAndResponse(w, catcherr.Unathorized, err)
+
+	err = auth.VerifyUser(r, login)
 	catcherr.HandleAndResponse(w, catcherr.Unathorized, err)
 
 	statusText := http.StatusText(http.StatusOK)
-	err = response.Send(w, responseData{http.StatusOK, statusText})
+	err = response.Send(w, response.Data{
+		StatusCode: http.StatusOK,
+		Data:       statusText,
+	})
 	catcherr.HandleError(err)
 }
 
-func registerHandler(w http.ResponseWriter, r *http.Request) {
-	defer catcherr.Recover(`api.registerHandler()`)
+func registerFunc(w http.ResponseWriter, r *http.Request) {
+	defer catcherr.Recover(`api.registerFunc()`)
 	ctx := r.Context()
 
 	bodyBuffer, err := io.ReadAll(r.Body)
 	catcherr.HandleAndResponse(w, catcherr.InternalServerError, err)
 
-	var acc database.User
-	err = json.Unmarshal(bodyBuffer, &acc)
+	var u database.User
+	err = json.Unmarshal(bodyBuffer, &u)
 	catcherr.HandleAndResponse(w, catcherr.InternalServerError, err)
 
-	err = registerUser(ctx, acc)
+	token, err := user.Register(ctx, u)
 	catcherr.HandleAndResponse(w, catcherr.InternalServerError, err)
 
-	data, err := createToken(acc.Login)
-	catcherr.HandleAndResponse(w, catcherr.Unathorized, err)
-
-	err = response.Send(w, responseData{http.StatusOK, data})
+	err = response.Send(w, response.Data{StatusCode: http.StatusOK, Data: token})
 	catcherr.HandleError(err)
 }
 
-func loginHandler(w http.ResponseWriter, r *http.Request) {
-	defer catcherr.Recover(`api.loginHandler()`)
+func loginFunc(w http.ResponseWriter, r *http.Request) {
+	defer catcherr.Recover(`api.loginFunc()`)
 	ctx := r.Context()
 
 	bodyBuffer, err := io.ReadAll(r.Body)
 	catcherr.HandleAndResponse(w, catcherr.InternalServerError, err)
 
-	var acc database.User
-	err = json.Unmarshal(bodyBuffer, &acc)
+	var u database.User
+	err = json.Unmarshal(bodyBuffer, &u)
 	catcherr.HandleAndResponse(w, catcherr.InternalServerError, err)
 
-	userInfo, err := database.GetUserInfo(ctx, acc.Login)
-	catcherr.HandleAndResponse(w, catcherr.InternalServerError, err)
-
-	err = user.ComparsePasswords(ctx, acc.Password, userInfo.Password)
+	token, err := user.Login(ctx, u)
 	catcherr.HandleAndResponse(w, catcherr.Unathorized, err)
 
-	data, err := createToken(acc.Login)
-	catcherr.HandleAndResponse(w, catcherr.Unathorized, err)
-
-	err = response.Send(w, responseData{http.StatusOK, data})
-	catcherr.HandleAndResponse(w, catcherr.InternalServerError, err)
+	err = response.Send(w, response.Data{StatusCode: http.StatusOK, Data: token})
+	catcherr.HandleError(err)
 }
 
-func fileUploadHandler(w http.ResponseWriter, r *http.Request) {
-	defer catcherr.Recover(`api.uploadHandler()`)
+func fileUploadFunc(w http.ResponseWriter, r *http.Request) {
+	defer catcherr.Recover(`api.fileUploadFunc()`)
 	ctx := r.Context()
 
-	uid, err := GetUserID(ctx, r)
+	login, err := auth.GetLoginFromCookie(r)
+	catcherr.HandleAndResponse(w, catcherr.Unathorized, err)
+
+	err = auth.VerifyUser(r, login)
 	catcherr.HandleAndResponse(w, catcherr.Unathorized, err)
 
 	err = r.ParseMultipartForm(32 << 20) // 32 MB
 	catcherr.HandleAndResponse(w, catcherr.InternalServerError, err)
 
-	destination := getUserDir(uid)
-
-	var (
-		file     multipart.File
-		fileData []user.FileStruct
-		fileList = r.MultipartForm.File["file"]
-	)
-
+	fileList := r.MultipartForm.File[`file`]
 	for _, fileHeader := range fileList {
-		file, err = fileHeader.Open()
+		checksum, err := user.SaveFile(ctx, fileHeader)
+		catcherr.HandleAndResponse(w, catcherr.InternalServerError, err)
 
-		// Save successfully uploaded files if catch an error
-		if err != nil {
-			saveErr := user.SaveUploadedFiles(fileData)
-			catcherr.HandleAndResponse(w, catcherr.InternalServerError, saveErr)
-			catcherr.HandleAndResponse(w, catcherr.InternalServerError, err)
-		}
-		defer file.Close()
-
-		fileData = append(
-			fileData,
-			user.FileStruct{
-				Directory:  destination,
-				File:       file,
-				FileHeader: fileHeader,
-			},
-		)
-
-	}
-	err = user.SaveUploadedFiles(fileData)
-	catcherr.HandleAndResponse(w, catcherr.InternalServerError, err)
-
-	statusText := http.StatusText(http.StatusOK)
-	err = response.Send(w, responseData{http.StatusOK, statusText})
-	catcherr.HandleError(err)
-}
-
-func fileDeletionHandler(w http.ResponseWriter, r *http.Request) {
-	defer catcherr.Recover(`api.fileDeletionHandler()`)
-
-	ctx := r.Context()
-
-	uid, err := GetUserID(ctx, r)
-	catcherr.HandleAndResponse(w, catcherr.Unathorized, err)
-
-	userDirectory := getUserDir(uid)
-
-	bodyBuffer, err := io.ReadAll(r.Body)
-	catcherr.HandleAndResponse(w, catcherr.InternalServerError, err)
-
-	var fileList fileListStruct
-	err = json.Unmarshal(bodyBuffer, &fileList)
-	catcherr.HandleAndResponse(w, catcherr.InternalServerError, err)
-
-	for _, v := range fileList.Files {
-		path := filepath.Join(userDirectory, v)
-		err = os.Remove(path)
+		// ToDo: delete the file if catch an error
+		err = database.SaveFileInfo(ctx, login, fileHeader.Filename, checksum)
 		catcherr.HandleAndResponse(w, catcherr.InternalServerError, err)
 	}
 
 	statusText := http.StatusText(http.StatusOK)
-	err = response.Send(w, responseData{http.StatusOK, statusText})
+	err = response.Send(w, response.Data{StatusCode: http.StatusOK, Data: statusText})
+	catcherr.HandleError(err)
+}
+
+func fileDeleteFunc(w http.ResponseWriter, r *http.Request) {
+	defer catcherr.Recover(`api.fileDeleteFunc()`)
+	ctx := r.Context()
+
+	login, err := auth.GetLoginFromCookie(r)
+	catcherr.HandleAndResponse(w, catcherr.Unathorized, err)
+
+	err = auth.VerifyUser(r, login)
+	catcherr.HandleAndResponse(w, catcherr.Unathorized, err)
+
+	files, err := database.GetFileList(ctx, login)
+	catcherr.HandleAndResponse(w, catcherr.InternalServerError, err)
+
+	bodyBuffer, err := io.ReadAll(r.Body)
+	catcherr.HandleAndResponse(w, catcherr.InternalServerError, err)
+
+	var file database.File
+	err = json.Unmarshal(bodyBuffer, &file)
+	catcherr.HandleAndResponse(w, catcherr.InternalServerError, err)
+
+	for _, v := range files {
+		if v.Checksum == file.Checksum {
+			err = user.RemoveFile(ctx, v.Checksum)
+			catcherr.HandleAndResponse(w, catcherr.InternalServerError, err)
+
+			err = database.RemoveFileInfo(ctx, login, v.Checksum)
+			catcherr.HandleAndResponse(w, catcherr.InternalServerError, err)
+			break
+		}
+	}
+	statusText := http.StatusText(http.StatusOK)
+	err = response.Send(w, response.Data{StatusCode: http.StatusOK, Data: statusText})
 	catcherr.HandleError(err)
 }

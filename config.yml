@@ -1,9 +1,9 @@
-host: "localhost:80"
+host: 'localhost:80'
 
-db_user: "postgres"
-db_pass: "123456"
-db_host: "localhost:5432"
-db_name: "users"
-db_sslmode: "disable"
+db_user: 'postgres'
+db_pass: '123456'
+db_host: 'localhost:5432'
+db_name: 'dexcloud'
+db_sslmode: 'disable'
 
 jwt_key: 'secret_key'

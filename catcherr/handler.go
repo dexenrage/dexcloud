@@ -25,20 +25,18 @@ import (
 )
 
 func init() {
-	BadRequest.BadRequest()
 	Unathorized.Unathorized()
 	Forbidden.Forbidden()
-	NotFound.NotFound()
 	InternalServerError.InternalServerError()
 }
 
-func HandleError(err error) {
+func HandleError(err any) {
 	if err != nil {
 		panic(err)
 	}
 }
 
-func HandleAndResponse(w http.ResponseWriter, c CustomError, err error) {
+func HandleAndResponse(w http.ResponseWriter, c CustomError, err any) {
 	if err != nil {
 		sendErrorData(w, c)
 		panic(err)
@@ -49,7 +47,7 @@ func RecoverAndReturnError() (err error) {
 	if r := recover(); r != nil {
 		return errors.New(fmt.Sprint(r))
 	}
-	return err
+	return nil
 }
 
 func Recover(sender string) {
@@ -58,9 +56,9 @@ func Recover(sender string) {
 	}
 }
 
-func logError(sender string, data interface{}) {
-	const tmpl = `[ Sender: %s ]: %v `
-	log.Printf(tmpl, sender, data)
+func logError(sender string, data any) {
+	const template = `[ Sender: %s ]: %v `
+	log.Printf(template, sender, data)
 }
 
 func sendErrorData(w http.ResponseWriter, c CustomError) {
@@ -69,6 +67,8 @@ func sendErrorData(w http.ResponseWriter, c CustomError) {
 
 	err := json.NewEncoder(w).Encode(c)
 	if err != nil {
-		logError(`catcherr.sendErrorData`, fmt.Sprint(`Can't send data to user. Reason: `, err))
+		const sender = `catcherr.sendErrorData()`
+		const template = `Can't send data to user. Reason: %v`
+		logError(sender, fmt.Sprintf(template, err))
 	}
 }
