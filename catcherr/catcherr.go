@@ -18,7 +18,6 @@ package catcherr
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -41,13 +40,6 @@ func HandleAndResponse(w http.ResponseWriter, c CustomError, err any) {
 		sendErrorData(w, c)
 		panic(err)
 	}
-}
-
-func RecoverAndReturnError() (err error) {
-	if r := recover(); r != nil {
-		return errors.New(fmt.Sprint(r))
-	}
-	return nil
 }
 
 func Recover(sender string) {

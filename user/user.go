@@ -119,33 +119,3 @@ func RemoveFile(ctx context.Context, checksum string) error {
 	}
 	return nil
 }
-
-/*func SaveUploadedFiles(files []FileStruct) (err error) {
-	defer func() { err = catcherr.RecoverAndReturnError() }()
-	for _, f := range files {
-		path := filepath.Join(f.Directory, f.FileHeader.Filename)
-
-		newFile, err := os.Create(path)
-		catcherr.HandleError(err)
-		defer newFile.Close()
-
-		_, err = io.Copy(newFile, f.File)
-		catcherr.HandleError(err)
-	}
-	return err
-}*/
-/*
-func GetFiles(dir string) (files []string, err error) {
-	defer func() { err = catcherr.RecoverAndReturnError() }()
-
-	entry, err := os.ReadDir(dir)
-	if errors.Is(err, fs.ErrNotExist) {
-		err = os.Mkdir(dir, os.ModePerm)
-	}
-	catcherr.HandleError(err)
-
-	for _, f := range entry {
-		files = append(files, f.Name())
-	}
-	return files, err
-}*/

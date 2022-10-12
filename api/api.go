@@ -63,26 +63,6 @@ func fileListFunc(w http.ResponseWriter, r *http.Request) {
 	catcherr.HandleError(err)
 }
 
-/*func fileListHandler(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-
-	uid, err := GetUserID(ctx, r)
-	catcherr.HandleAndResponse(w, catcherr.Unathorized, err)
-
-	dir := getUserDir(uid)
-
-	files, err := user.GetFiles(dir)
-	catcherr.HandleAndResponse(w, catcherr.InternalServerError, err)
-
-	data := fileListStruct{
-		UserID: uid,
-		Files:  files,
-	}
-
-	err = response.Send(w, responseData{http.StatusOK, data})
-	catcherr.HandleError(err)
-}*/
-
 func authCheckFunc(w http.ResponseWriter, r *http.Request) {
 	defer catcherr.Recover(`api.authCheckFunc()`)
 

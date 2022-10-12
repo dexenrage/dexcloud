@@ -74,7 +74,6 @@ func init() {
 }
 
 func RegisterUser(ctx context.Context, u User) (user User, err error) {
-	defer func() { err = catcherr.RecoverAndReturnError() }()
 	_, err = db.NewInsert().Model(&u).Exec(ctx)
 	if err != nil {
 		return User{}, err
